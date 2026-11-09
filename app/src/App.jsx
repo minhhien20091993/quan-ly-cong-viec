@@ -402,23 +402,29 @@ export default function App() {
     <div className={`min-h-screen w-full font-sans antialiased transition-colors duration-200 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       {cloudError && <div role="status" className="bg-amber-950 px-4 py-2 text-center text-xs text-amber-200">{cloudError}</div>}
       <header className={`sticky top-0 z-40 w-full border-b backdrop-blur-xl ${darkMode ? 'bg-slate-900/85 border-slate-800/80 shadow-lg shadow-black/20' : 'bg-white/85 border-slate-200/80 shadow-sm'}`}>
-        <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/25">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 px-3 py-2 sm:px-6 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:gap-4 lg:py-0">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-blue-500 text-white shadow-lg shadow-blue-500/25 sm:h-10 sm:w-10">
               <Activity className="w-5 h-5"/>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="font-bold text-base sm:text-lg tracking-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Quản lý công việc</h1>
+                <h1 className="truncate whitespace-nowrap bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-sm font-bold tracking-tight text-transparent sm:text-lg">Quản lý công việc</h1>
                 <span className="hidden sm:inline-block px-2.5 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20">Đồng bộ Supabase</span>
               </div>
             </div>
           </div>
+            <div className="flex shrink-0 items-center gap-2 lg:hidden">
+              <button onClick={() => supabase.auth.signOut()} className={`rounded-xl border px-2.5 py-2 text-xs ${darkMode ? 'border-slate-800 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-100'}`} title={session?.user?.email || 'Đăng xuất'}>Thoát</button>
+              <button onClick={() => setDarkMode(!darkMode)} className={`rounded-xl border p-2 transition ${darkMode ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`} title="Chuyển đổi giao diện Sáng / Tối">{darkMode ? <Sun className="h-4 w-4"/> : <Moon className="h-4 w-4"/>}</button>
+            </div>
+          </div>
 
-          <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center sm:gap-3">
             <button 
               onClick={() => { setActiveTab('category'); setActiveCategorySubTab('staff'); }}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium border transition-all ${
+              className={`flex min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-2.5 py-2 text-xs font-medium transition-all sm:px-3.5 sm:text-sm ${
                 activeTab === 'category' ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/30' : darkMode ? 'border-slate-800 hover:bg-slate-800 text-slate-300' : 'border-slate-200 hover:bg-slate-100 text-slate-700'
               }`}
             >
@@ -442,19 +448,19 @@ export default function App() {
                 });
                 setIsTaskModalOpen(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs sm:text-sm font-medium shadow-lg shadow-blue-600/30 transition-all active:scale-95"
+              className="flex min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-2 text-xs font-medium text-white shadow-lg shadow-blue-600/30 transition-all hover:from-blue-500 hover:to-indigo-500 active:scale-95 sm:px-4 sm:text-sm"
             >
               <Plus className="w-4 h-4"/>
               <span>Tạo việc mới</span>
             </button>
 
-            <div className={`h-6 w-[1px] ${darkMode ? 'bg-slate-800' : 'bg-slate-200'} mx-1`}></div>
+            <div className={`hidden h-6 w-px sm:block ${darkMode ? 'bg-slate-800' : 'bg-slate-200'} mx-1`}></div>
 
-            <button onClick={() => supabase.auth.signOut()} className={`rounded-xl border px-3 py-2 text-xs ${darkMode ? 'border-slate-800 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-100'}`} title={session?.user?.email || 'Đăng xuất'}>Đăng xuất</button>
+            <button onClick={() => supabase.auth.signOut()} className={`hidden rounded-xl border px-3 py-2 text-xs sm:block ${darkMode ? 'border-slate-800 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-100'}`} title={session?.user?.email || 'Đăng xuất'}>Đăng xuất</button>
 
             <button 
               onClick={() => setDarkMode(!darkMode)}
-              className={`p-2 rounded-xl border transition ${darkMode ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+              className={`hidden rounded-xl border p-2 transition sm:block ${darkMode ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'}`}
               title="Chuyển đổi giao diện Sáng / Tối"
             >
               {darkMode ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
@@ -463,80 +469,80 @@ export default function App() {
         </div>
       </header>
 
-      <main className="w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
+      <main className="mx-auto w-full max-w-[1600px] min-w-0 space-y-4 px-3 py-4 sm:space-y-6 sm:px-6 sm:py-6 lg:px-8">
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 sm:gap-4">
+          <div className={`min-w-0 rounded-2xl border p-3 transition-all sm:p-4 ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-medium text-slate-400">Tổng việc / Sự cố</p>
-                <h3 className="text-2xl font-bold mt-1 tracking-tight">{stats.total}</h3>
+                <p className="text-[11px] font-medium leading-tight text-slate-400 sm:text-xs">Tổng việc / Sự cố</p>
+                <h3 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">{stats.total}</h3>
               </div>
-              <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/15"><CheckSquare className="w-5 h-5"/></div>
+              <div className="rounded-xl border border-blue-500/15 bg-blue-500/10 p-2 text-blue-400 sm:p-2.5"><CheckSquare className="h-4 w-4 sm:h-5 sm:w-5"/></div>
             </div>
           </div>
 
-          <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className={`min-w-0 rounded-2xl border p-3 transition-all sm:p-4 ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-medium text-slate-400">Đang thực hiện</p>
-                <h3 className="text-2xl font-bold mt-1 tracking-tight text-amber-400">{stats.inProgress}</h3>
+                <p className="text-[11px] font-medium leading-tight text-slate-400 sm:text-xs">Đang thực hiện</p>
+                <h3 className="mt-1 text-xl font-bold tracking-tight text-amber-400 sm:text-2xl">{stats.inProgress}</h3>
               </div>
-              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/15"><Clock className="w-5 h-5"/></div>
+              <div className="rounded-xl border border-amber-500/15 bg-amber-500/10 p-2 text-amber-400 sm:p-2.5"><Clock className="h-4 w-4 sm:h-5 sm:w-5"/></div>
             </div>
           </div>
 
-          <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className={`min-w-0 rounded-2xl border p-3 transition-all sm:p-4 ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-medium text-slate-400">Giờ thực tế / Dự kiến</p>
-                <h3 className="text-xl sm:text-2xl font-bold mt-1 tracking-tight text-emerald-400">{stats.totalAct}h <span className="text-xs font-normal text-slate-500">({stats.totalEst}h)</span></h3>
+                <p className="text-[11px] font-medium leading-tight text-slate-400 sm:text-xs">Giờ thực tế / Dự kiến</p>
+                <h3 className="mt-1 text-lg font-bold tracking-tight text-emerald-400 sm:text-2xl">{stats.totalAct}h <span className="text-[10px] font-normal text-slate-500 sm:text-xs">({stats.totalEst}h)</span></h3>
               </div>
-              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/15"><BarChart3 className="w-5 h-5"/></div>
+              <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/10 p-2 text-emerald-400 sm:p-2.5"><BarChart3 className="h-4 w-4 sm:h-5 sm:w-5"/></div>
             </div>
           </div>
 
-          <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className={`min-w-0 rounded-2xl border p-3 transition-all sm:p-4 ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
             <div className="flex justify-between items-start">
               <div>
-                <p className="text-xs font-medium text-slate-400">Nhân sự vận hành</p>
-                <h3 className="text-2xl font-bold mt-1 tracking-tight text-purple-400">{staffList.length}</h3>
+                <p className="text-[11px] font-medium leading-tight text-slate-400 sm:text-xs">Nhân sự vận hành</p>
+                <h3 className="mt-1 text-xl font-bold tracking-tight text-purple-400 sm:text-2xl">{staffList.length}</h3>
               </div>
-              <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/15"><Users className="w-5 h-5"/></div>
+              <div className="rounded-xl border border-purple-500/15 bg-purple-500/10 p-2 text-purple-400 sm:p-2.5"><Users className="h-4 w-4 sm:h-5 sm:w-5"/></div>
             </div>
           </div>
         </div>
 
-        <div className={`p-4 rounded-2xl border ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'} flex flex-col gap-4`}>
-          <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3">
-            <div className={`flex p-1 rounded-xl ${darkMode ? 'bg-slate-950/80 border border-slate-800/80' : 'bg-slate-100'}`}>
+        <div className={`flex min-w-0 flex-col gap-3 rounded-2xl border p-3 sm:gap-4 sm:p-4 ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className="flex min-w-0 flex-col items-stretch justify-between gap-3 lg:flex-row lg:items-center">
+            <div className={`grid w-full min-w-0 grid-cols-3 gap-1 rounded-xl p-1 sm:flex sm:w-auto ${darkMode ? 'bg-slate-950/80 border border-slate-800/80' : 'bg-slate-100'}`}>
               <button
                 onClick={() => setActiveTab('kanban')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[10px] font-medium transition-all sm:flex-none sm:gap-2 sm:px-4 sm:text-sm ${
                   activeTab === 'kanban' ? 'bg-blue-600 text-white shadow-md' : darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600'
                 }`}
               >
-                <LayoutDashboard className="w-4 h-4"/> Kanban
+                <LayoutDashboard className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span>Kanban</span>
               </button>
               <button
                 onClick={() => setActiveTab('list')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[10px] font-medium transition-all sm:flex-none sm:gap-2 sm:px-4 sm:text-sm ${
                   activeTab === 'list' ? 'bg-blue-600 text-white shadow-md' : darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600'
                 }`}
               >
-                <CheckSquare className="w-4 h-4"/> Danh sách
+                <CheckSquare className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span>Danh sách</span>
               </button>
               <button
                 onClick={() => setActiveTab('analytics')}
-                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[10px] font-medium transition-all sm:flex-none sm:gap-2 sm:px-4 sm:text-sm ${
                   activeTab === 'analytics' ? 'bg-blue-600 text-white shadow-md' : darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600'
                 }`}
               >
-                <BarChart3 className="w-4 h-4"/> Thống kê & Lịch sử
+                <BarChart3 className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span className="sm:hidden">Thống kê</span><span className="hidden sm:inline">Thống kê &amp; Lịch sử</span>
               </button>
             </div>
 
             {activeTab !== 'category' && (
-              <div className="relative min-w-[260px]">
+              <div className="relative w-full min-w-0 lg:max-w-xs">
                 <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400"/>
                 <input 
                   type="text" 
@@ -550,15 +556,15 @@ export default function App() {
           </div>
 
           {activeTab !== 'category' && (
-            <div className="flex flex-wrap items-center gap-2.5 pt-3 border-t border-slate-800/40">
-              <span className="text-xs text-slate-400 flex items-center gap-1.5 font-medium mr-1">
+            <div className="grid grid-cols-2 items-center gap-2 border-t border-slate-800/40 pt-3 sm:flex sm:flex-wrap sm:gap-2.5">
+              <span className="col-span-2 mr-1 flex items-center gap-1.5 text-xs font-medium text-slate-400 sm:col-span-1">
                 <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400"/> Lọc nhanh:
               </span>
 
               <select
                 value={filterDate}
                 onChange={(e) => setFilterDate(e.target.value)}
-                className={`px-3 py-2 text-xs rounded-xl border ${darkMode ? 'bg-slate-950/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} focus:outline-none`}
+                className={`w-full min-w-0 truncate rounded-xl border px-2.5 py-2 text-[11px] focus:outline-none sm:w-auto sm:px-3 sm:text-xs ${darkMode ? 'bg-slate-950/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
               >
                 <option value="ALL">📅 Tất cả các ngày</option>
                 {availableDates.map((dateStr) => (
@@ -569,7 +575,7 @@ export default function App() {
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
-                className={`px-3 py-2 text-xs rounded-xl border ${darkMode ? 'bg-slate-950/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} focus:outline-none`}
+                className={`w-full min-w-0 truncate rounded-xl border px-2.5 py-2 text-[11px] focus:outline-none sm:w-auto sm:px-3 sm:text-xs ${darkMode ? 'bg-slate-950/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
               >
                 <option value="ALL">Tất cả mức ưu tiên</option>
                 <option value="P1 - Khẩn cấp">P1 - Khẩn cấp</option>
@@ -581,7 +587,7 @@ export default function App() {
               <select
                 value={filterDept}
                 onChange={(e) => setFilterDept(e.target.value)}
-                className={`px-3 py-2 text-xs rounded-xl border ${darkMode ? 'bg-slate-950/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} focus:outline-none`}
+                className={`w-full min-w-0 truncate rounded-xl border px-2.5 py-2 text-[11px] focus:outline-none sm:w-auto sm:px-3 sm:text-xs ${darkMode ? 'bg-slate-950/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
               >
                 <option value="ALL">Tất cả Khoa/Phòng</option>
                 {departments.map((dept, i) => (
@@ -592,7 +598,7 @@ export default function App() {
               <select
                 value={filterAssignee}
                 onChange={(e) => setFilterAssignee(e.target.value)}
-                className={`px-3 py-2 text-xs rounded-xl border ${darkMode ? 'bg-slate-950/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'} focus:outline-none`}
+                className={`w-full min-w-0 truncate rounded-xl border px-2.5 py-2 text-[11px] focus:outline-none sm:w-auto sm:px-3 sm:text-xs ${darkMode ? 'bg-slate-950/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
               >
                 <option value="ALL">Tất cả nhân sự phụ trách</option>
                 {staffList.map((s) => (
