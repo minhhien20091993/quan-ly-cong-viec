@@ -1021,23 +1021,26 @@ export default function App() {
       </main>
 
       {isTaskModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className={`w-full max-w-2xl p-6 sm:p-7 rounded-3xl border ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-slate-200 shadow-2xl'} space-y-4 max-h-[90vh] overflow-y-auto`}>
-            <div className="flex justify-between items-center">
-              <h3 className="text-base sm:text-lg font-bold">{editingTask ? 'Chỉnh sửa & Nhật ký Sự cố' : 'Tạo Công việc / Sự cố mới'}</h3>
-              <button onClick={() => setIsTaskModalOpen(false)} className="text-slate-400 hover:text-white text-sm font-bold px-2 py-1">✕</button>
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
+          <div className={`w-full max-w-2xl h-[94dvh] sm:h-auto sm:max-h-[90vh] flex flex-col rounded-t-3xl sm:rounded-3xl border ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-slate-200 shadow-2xl'} overflow-hidden`}>
+            <div className={`shrink-0 flex justify-between items-center px-5 py-4 sm:px-7 border-b ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+              <div>
+                <h3 className="text-lg font-bold">{editingTask ? 'Chỉnh sửa công việc' : 'Tạo công việc mới'}</h3>
+                <p className="text-xs text-slate-400 mt-1">Nhập thông tin để giao việc và theo dõi tiến độ.</p>
+              </div>
+              <button type="button" aria-label="Đóng biểu mẫu" onClick={() => setIsTaskModalOpen(false)} className="w-10 h-10 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white text-lg font-medium">✕</button>
             </div>
             
-            <form onSubmit={handleSaveTask} className="space-y-4">
+            <form onSubmit={handleSaveTask} className="flex-1 min-h-0 overflow-y-auto px-5 py-5 sm:px-7 space-y-5 overscroll-contain">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Tiêu đề công việc / Sự cố *</label>
                 <input 
                   type="text" 
                   required
-                  placeholder="Ví dụ: Ví dụ: Thiết lập máy in văn phòng"
+                  placeholder="Ví dụ: Thiết lập máy in văn phòng"
                   value={taskForm.title}
                   onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200'}`}
+                  className={`w-full min-h-12 px-4 py-3 text-base sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200'}`}
                 />
               </div>
 
@@ -1048,7 +1051,7 @@ export default function App() {
                   placeholder="Mô tả hiện trạng, yêu cầu hỗ trợ..."
                   value={taskForm.description}
                   onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
-                  className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200'}`}
+                  className={`w-full min-h-24 px-4 py-3 text-base sm:text-sm rounded-xl border resize-y ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200'}`}
                 ></textarea>
               </div>
 
@@ -1060,7 +1063,7 @@ export default function App() {
                     required
                     value={taskForm.dateTime}
                     onChange={(e) => setTaskForm({ ...taskForm, dateTime: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200'}`}
+                    className={`w-full min-h-12 px-4 py-3 text-base sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200'}`}
                   />
                 </div>
 
@@ -1069,8 +1072,9 @@ export default function App() {
                   <select
                     value={taskForm.department}
                     onChange={(e) => setTaskForm({ ...taskForm, department: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    className={`w-full min-h-12 px-4 py-3 text-base sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                   >
+                    <option value="" disabled>Chọn bộ phận</option>
                     {departments.map((dept, i) => (
                       <option key={i} value={dept}>{dept}</option>
                     ))}
@@ -1084,12 +1088,12 @@ export default function App() {
                   <select
                     value={taskForm.priority}
                     onChange={(e) => handlePriorityChange(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    className={`w-full min-h-12 px-4 py-3 text-base sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                   >
-                    <option value="P1 - Khẩn cấp">P1 - Khẩn cấp (0.5h / 30 phút)</option>
-                    <option value="P2 - Cao">P2 - Cao (2 giờ)</option>
-                    <option value="P3 - Trung bình">P3 - Trung bình (4 giờ)</option>
-                    <option value="P4 - Thấp">P4 - Thấp (8 giờ)</option>
+                    <option value="P1 - Khẩn cấp">P1 · Khẩn cấp · 30 phút</option>
+                    <option value="P2 - Cao">P2 · Cao · 2 giờ</option>
+                    <option value="P3 - Trung bình">P3 · Trung bình · 4 giờ</option>
+                    <option value="P4 - Thấp">P4 · Thấp · 8 giờ</option>
                   </select>
                 </div>
 
@@ -1098,7 +1102,7 @@ export default function App() {
                   <select
                     value={taskForm.status}
                     onChange={(e) => setTaskForm({ ...taskForm, status: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    className={`w-full min-h-12 px-4 py-3 text-base sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                   >
                     <option value="Todo">Cần làm (To Do)</option>
                     <option value="In Progress">Đang xử lý (In Progress)</option>
@@ -1113,7 +1117,7 @@ export default function App() {
                   <select
                     value={taskForm.assignee}
                     onChange={(e) => setTaskForm({ ...taskForm, assignee: e.target.value })}
-                    className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                    className={`w-full min-h-12 px-4 py-3 text-base sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
                   >
                     <option value="">-- Chọn --</option>
                     {staffList.map(s => (
@@ -1176,7 +1180,7 @@ export default function App() {
                 </div>
               )}
 
-              <div className="flex justify-end gap-3 pt-3">
+              <div className={`sticky bottom-0 -mx-5 sm:-mx-7 px-5 sm:px-7 py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                 <button type="button" onClick={() => setIsTaskModalOpen(false)} className={`px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition ${darkMode ? 'border-slate-800 hover:bg-slate-800 text-slate-300' : 'border-slate-300 hover:bg-slate-100'}`}>Hủy</button>
                 <button type="submit" className="px-5 py-2.5 text-xs sm:text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-600/30 transition">Lưu công việc</button>
               </div>
@@ -1186,9 +1190,12 @@ export default function App() {
       )}
 
       {isStaffModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className={`w-full max-w-md p-6 sm:p-7 rounded-3xl border ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-slate-200 shadow-2xl'} space-y-4`}>
-            <h3 className="text-base sm:text-lg font-bold">{editingStaff ? 'Chỉnh sửa Nhân sự' : 'Thêm Nhân sự mới'}</h3>
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className={`w-full max-w-md max-h-[92dvh] overflow-y-auto p-5 sm:p-7 rounded-t-3xl sm:rounded-3xl border ${darkMode ? 'bg-slate-900 border-slate-800 shadow-2xl' : 'bg-white border-slate-200 shadow-2xl'} space-y-4`}>
+            <div className="flex items-start justify-between gap-4">
+              <div><h3 className="text-lg font-bold">{editingStaff ? 'Chỉnh sửa nhân sự' : 'Thêm nhân sự mới'}</h3><p className="mt-1 text-xs text-slate-400">Cập nhật thông tin người phụ trách.</p></div>
+              <button type="button" aria-label="Đóng biểu mẫu" onClick={() => setIsStaffModalOpen(false)} className="w-10 h-10 shrink-0 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white">✕</button>
+            </div>
             <form onSubmit={handleSaveStaff} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Họ và tên *</label>
@@ -1206,7 +1213,7 @@ export default function App() {
                 <label className="block text-xs font-medium text-slate-400 mb-1">Số điện thoại</label>
                 <input type="text" placeholder="" value={staffForm.phone} onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })} className={`w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`} />
               </div>
-              <div className="flex justify-end gap-3 pt-3">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-3">
                 <button type="button" onClick={() => setIsStaffModalOpen(false)} className={`px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition ${darkMode ? 'border-slate-800 hover:bg-slate-800 text-slate-300' : 'border-slate-300 hover:bg-slate-100'}`}>Hủy</button>
                 <button type="submit" className="px-5 py-2.5 text-xs sm:text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg transition">Lưu nhân sự</button>
               </div>
