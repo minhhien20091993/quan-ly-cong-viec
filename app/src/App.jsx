@@ -26,7 +26,9 @@ import {
   AlertTriangle,
   MessageSquare,
   Send,
-  Hourglass
+  Hourglass,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 const getVnDateTimeString = () => {
@@ -37,6 +39,13 @@ const getVnDateTimeString = () => {
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
   return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const getLocalDateString = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 export default function App() {
@@ -78,6 +87,11 @@ export default function App() {
   const [filterAssignee, setFilterAssignee] = useState('ALL');
   const [filterDept, setFilterDept] = useState('ALL');
   const [filterDate, setFilterDate] = useState('ALL');
+  const [calendarSelectedDate, setCalendarSelectedDate] = useState(() => getLocalDateString());
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
 
   const [isCategoryUnlocked, setIsCategoryUnlocked] = useState(false);
   const [categoryPassInput, setCategoryPassInput] = useState('');
@@ -150,6 +164,7 @@ export default function App() {
     department: 'Bộ phận Hành chính',
     estimatedHours: 4,
     dateTime: getVnDateTimeString(),
+    scheduledDate: getLocalDateString(),
     comments: []
   });
 
@@ -286,6 +301,37 @@ export default function App() {
     });
   }, [tasks, searchTerm, filterPriority, filterAssignee, filterDept, filterDate]);
 
+  const calendarTasks = useMemo(() => tasks.filter(task => {
+    const matchSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    return matchSearch && (filterPriority === 'ALL' || task.priority === filterPriority) &&
+      (filterAssignee === 'ALL' || task.assignee === filterAssignee) &&
+      (filterDept === 'ALL' || task.department === filterDept);
+  }), [tasks, searchTerm, filterPriority, filterAssignee, filterDept]);
+
+  const calendarDaysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
+  const calendarStartOffset = (new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1).getDay() + 6) % 7;
+  const calendarCellCount = Math.ceil((calendarStartOffset + calendarDaysInMonth) / 7) * 7;
+  const calendarCells = Array.from({ length: calendarCellCount }, (_, index) => {
+    const day = index - calendarStartOffset + 1;
+    return day > 0 && day <= calendarDaysInMonth
+      ? getLocalDateString(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day))
+      : null;
+  });
+  const selectedDayTasks = calendarTasks
+    .filter(task => (task.scheduledDate || task.dateTime?.split('T')[0]) === calendarSelectedDate)
+    .sort((a, b) => (a.dateTime || '').localeCompare(b.dateTime || ''));
+
+  const openNewTask = (scheduledDate = getLocalDateString()) => {
+    setEditingTask(null);
+    setTaskForm({
+      title: '', description: '', assignee: staffList[0]?.name || '', priority: 'P3 - Trung bình',
+      status: 'Todo', department: departments[0] || '', estimatedHours: 4,
+      dateTime: getVnDateTimeString(), scheduledDate, comments: []
+    });
+    setIsTaskModalOpen(true);
+  };
+
   const handleQuickStatusChange = (taskId, newStatus) => {
     setTasks(tasks.map(t => {
       if (t.id !== taskId) return t;
@@ -328,7 +374,11 @@ export default function App() {
     if (!taskForm.title.trim()) return;
 
     const parsedHours = parseFloat(taskForm.estimatedHours) || 0;
-    const finalTaskForm = { ...taskForm, estimatedHours: parsedHours };
+    const finalTaskForm = {
+      ...taskForm,
+      scheduledDate: taskForm.scheduledDate || taskForm.dateTime?.split('T')[0] || getLocalDateString(),
+      estimatedHours: parsedHours
+    };
 
     if (editingTask) {
       setTasks(tasks.map(t => t.id === editingTask.id ? { ...finalTaskForm, id: t.id, startTimestamp: t.startTimestamp, totalTimeSpent: t.totalTimeSpent } : t));
@@ -433,21 +483,7 @@ export default function App() {
             </button>
 
             <button 
-              onClick={() => {
-                setEditingTask(null);
-                setTaskForm({
-                  title: '',
-                  description: '',
-                  assignee: staffList[0]?.name || '',
-                  priority: 'P3 - Trung bình',
-                  status: 'Todo',
-                  department: departments[0],
-                  estimatedHours: 4,
-                  dateTime: getVnDateTimeString(),
-                  comments: []
-                });
-                setIsTaskModalOpen(true);
-              }}
+              onClick={() => openNewTask(activeTab === 'calendar' ? calendarSelectedDate : getLocalDateString())}
               className="flex min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-2.5 py-2 text-xs font-medium text-white shadow-lg shadow-blue-600/30 transition-all hover:from-blue-500 hover:to-indigo-500 active:scale-95 sm:px-4 sm:text-sm"
             >
               <Plus className="w-4 h-4"/>
@@ -514,7 +550,15 @@ export default function App() {
 
         <div className={`flex min-w-0 flex-col gap-3 rounded-2xl border p-3 sm:gap-4 sm:p-4 ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
           <div className="flex min-w-0 flex-col items-stretch justify-between gap-3 lg:flex-row lg:items-center">
-            <div className={`grid w-full min-w-0 grid-cols-3 gap-1 rounded-xl p-1 sm:flex sm:w-auto ${darkMode ? 'bg-slate-950/80 border border-slate-800/80' : 'bg-slate-100'}`}>
+            <div className={`grid w-full min-w-0 grid-cols-4 gap-1 rounded-xl p-1 sm:flex sm:w-auto ${darkMode ? 'bg-slate-950/80 border border-slate-800/80' : 'bg-slate-100'}`}>
+              <button
+                onClick={() => setActiveTab('calendar')}
+                className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[10px] font-medium transition-all sm:flex-none sm:gap-2 sm:px-4 sm:text-sm ${
+                  activeTab === 'calendar' ? 'bg-blue-600 text-white shadow-md' : darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600'
+                }`}
+              >
+                <Calendar className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span>Lịch</span>
+              </button>
               <button
                 onClick={() => setActiveTab('kanban')}
                 className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[10px] font-medium transition-all sm:flex-none sm:gap-2 sm:px-4 sm:text-sm ${
@@ -561,16 +605,18 @@ export default function App() {
                 <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400"/> Lọc nhanh:
               </span>
 
-              <select
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className={`w-full min-w-0 truncate rounded-xl border px-2.5 py-2 text-[11px] focus:outline-none sm:w-auto sm:px-3 sm:text-xs ${darkMode ? 'bg-slate-950/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
-              >
-                <option value="ALL">📅 Tất cả các ngày</option>
-                {availableDates.map((dateStr) => (
-                  <option key={dateStr} value={dateStr}>Ngày: {dateStr}</option>
-                ))}
-              </select>
+              {activeTab !== 'calendar' && (
+                <select
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className={`w-full min-w-0 truncate rounded-xl border px-2.5 py-2 text-[11px] focus:outline-none sm:w-auto sm:px-3 sm:text-xs ${darkMode ? 'bg-slate-950/80 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
+                >
+                  <option value="ALL">📅 Tất cả các ngày</option>
+                  {availableDates.map((dateStr) => (
+                    <option key={dateStr} value={dateStr}>Ngày: {dateStr}</option>
+                  ))}
+                </select>
+              )}
 
               <select
                 value={filterPriority}
@@ -608,6 +654,67 @@ export default function App() {
             </div>
           )}
         </div>
+
+        {activeTab === 'calendar' && (
+          <section className={`overflow-hidden rounded-2xl border ${darkMode ? 'border-slate-800 bg-slate-900/40 shadow-xl' : 'border-slate-200 bg-white shadow-sm'}`}>
+            <div className={`flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+              <div>
+                <h2 className="text-lg font-bold capitalize">{calendarMonth.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}</h2>
+                <p className="mt-1 text-xs text-slate-400">{calendarTasks.length} công việc phù hợp với bộ lọc</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={() => { const month = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1); setCalendarMonth(month); setCalendarSelectedDate(getLocalDateString(month)); }} className={`flex h-10 w-10 items-center justify-center rounded-xl border ${darkMode ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`} aria-label="Tháng trước"><ChevronLeft className="h-4 w-4"/></button>
+                <button onClick={() => { const today = new Date(); setCalendarMonth(new Date(today.getFullYear(), today.getMonth(), 1)); setCalendarSelectedDate(getLocalDateString(today)); }} className={`h-10 rounded-xl border px-3 text-xs font-medium ${darkMode ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-100'}`}>Hôm nay</button>
+                <button onClick={() => { const month = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1); setCalendarMonth(month); setCalendarSelectedDate(getLocalDateString(month)); }} className={`flex h-10 w-10 items-center justify-center rounded-xl border ${darkMode ? 'border-slate-700 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`} aria-label="Tháng sau"><ChevronRight className="h-4 w-4"/></button>
+                <button onClick={() => openNewTask(calendarSelectedDate)} className="flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-3.5 text-xs font-semibold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500"><Plus className="h-4 w-4"/> Thêm việc ngày này</button>
+              </div>
+            </div>
+
+            <div className="p-2 sm:p-4">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day, index) => <div key={day} className={`py-2 text-center text-[10px] font-semibold uppercase tracking-wide sm:text-xs ${index > 4 ? 'text-blue-400' : 'text-slate-400'}`}>{day}</div>)}
+                {calendarCells.map((date, index) => {
+                  if (!date) return <div key={`empty-${index}`} className="min-h-[72px] rounded-xl sm:min-h-[108px]"/>;
+                  const dayTasks = calendarTasks.filter(task => (task.scheduledDate || task.dateTime?.split('T')[0]) === date);
+                  const isSelected = date === calendarSelectedDate;
+                  const isToday = date === getLocalDateString();
+                  return (
+                    <button key={date} onClick={() => setCalendarSelectedDate(date)} className={`flex min-h-[72px] min-w-0 flex-col items-stretch rounded-xl border p-1.5 text-left transition sm:min-h-[108px] sm:p-2 ${isSelected ? 'border-blue-500 bg-blue-600/10 ring-1 ring-blue-500/40' : darkMode ? 'border-slate-800/80 bg-slate-950/40 hover:border-slate-700' : 'border-slate-100 bg-slate-50 hover:border-slate-300'}`}>
+                      <span className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold sm:mx-0 sm:h-7 sm:w-7 sm:text-xs ${isToday ? 'bg-blue-600 text-white' : isSelected ? 'text-blue-400' : 'text-slate-300'}`}>{Number(date.slice(-2))}</span>
+                      <div className="mt-1 hidden w-full space-y-1 sm:block">
+                        {dayTasks.slice(0, 2).map(task => <div key={task.id} className={`truncate rounded-md px-1.5 py-1 text-[10px] ${task.status === 'Done' ? 'bg-emerald-500/10 text-emerald-300' : task.status === 'In Progress' ? 'bg-amber-500/10 text-amber-300' : 'bg-blue-500/10 text-blue-300'}`}>{task.title}</div>)}
+                        {dayTasks.length > 2 && <div className="px-1 text-[10px] text-slate-500">+{dayTasks.length - 2} việc</div>}
+                      </div>
+                      {dayTasks.length > 0 && <span className="mt-auto flex items-center justify-center gap-1 pt-1 sm:hidden"><span className="h-1.5 w-1.5 rounded-full bg-blue-400"/><span className="text-[9px] text-slate-400">{dayTasks.length}</span></span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className={`border-t p-4 sm:p-5 ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold capitalize">{new Date(`${calendarSelectedDate}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}</h3>
+                  <p className="mt-0.5 text-xs text-slate-400">{selectedDayTasks.length} công việc trong ngày</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {selectedDayTasks.map(task => (
+                  <button key={task.id} onClick={() => { setEditingTask(task); setTaskForm({ ...task, scheduledDate: task.scheduledDate || task.dateTime?.split('T')[0] || calendarSelectedDate }); setIsTaskModalOpen(true); }} className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${darkMode ? 'border-slate-800 bg-slate-950/60 hover:border-blue-500/50' : 'border-slate-200 bg-slate-50 hover:border-blue-400'}`}>
+                    <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${task.status === 'Done' ? 'bg-emerald-400' : task.status === 'In Progress' ? 'bg-amber-400' : 'bg-blue-400'}`}/>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">{task.title}</span>
+                      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400"><span>{task.dateTime?.split('T')[1] ? `Tiếp nhận ${task.dateTime.split('T')[1]}` : 'Chưa có giờ tiếp nhận'}</span><span>{task.assignee || 'Chưa giao'}</span><span>{task.department || 'Chưa có bộ phận'}</span></span>
+                    </span>
+                    <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-medium ${task.status === 'Done' ? 'bg-emerald-500/10 text-emerald-300' : task.status === 'In Progress' ? 'bg-amber-500/10 text-amber-300' : 'bg-blue-500/10 text-blue-300'}`}>{task.status === 'Done' ? 'Hoàn thành' : task.status === 'In Progress' ? 'Đang làm' : 'Cần làm'}</span>
+                  </button>
+                ))}
+                {selectedDayTasks.length === 0 && <div className={`rounded-xl border border-dashed p-7 text-center ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}><Calendar className="mx-auto h-7 w-7 text-slate-500"/><p className="mt-2 text-sm font-medium">Chưa có công việc trong ngày</p><p className="mt-1 text-xs text-slate-400">Thêm việc để lên lịch cho ngày này.</p></div>}
+              </div>
+            </div>
+          </section>
+        )}
 
         {activeTab === 'kanban' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -1080,6 +1187,17 @@ export default function App() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Ngày dự kiến thực hiện</label>
+                <input
+                  type="date"
+                  value={taskForm.scheduledDate || taskForm.dateTime?.split('T')[0] || ''}
+                  onChange={(e) => setTaskForm({ ...taskForm, scheduledDate: e.target.value })}
+                  className={`w-full min-h-12 px-4 py-3 text-base sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200'}`}
+                />
+                <p className="mt-1 text-[11px] text-slate-500">Ngày này sẽ được hiển thị trên Lịch công việc.</p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
