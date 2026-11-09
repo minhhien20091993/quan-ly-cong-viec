@@ -732,7 +732,13 @@ export default function App() {
               { id: 'In Progress', title: 'Đang xử lý (In Progress)', border: 'border-amber-500/30', headerBg: 'bg-amber-500/10 text-amber-400' },
               { id: 'Done', title: 'Hoàn thành (Done)', border: 'border-emerald-500/30', headerBg: 'bg-emerald-500/10 text-emerald-400' }
             ].map(col => {
-              const colTasks = filteredTasks.filter(t => t.status === col.id);
+              const colTasks = filteredTasks
+                .filter(t => t.status === col.id)
+                .sort((a, b) => {
+                  const dateA = a.scheduledDate || a.dateTime?.split('T')[0] || '9999-12-31';
+                  const dateB = b.scheduledDate || b.dateTime?.split('T')[0] || '9999-12-31';
+                  return dateA.localeCompare(dateB) || (a.dateTime || '').localeCompare(b.dateTime || '');
+                });
               return (
                 <div key={col.id} className={`p-4 rounded-2xl border ${col.border} ${darkMode ? 'bg-slate-900/30 shadow-xl' : 'bg-white shadow-sm'} flex flex-col gap-3.5`}>
                   <div className={`flex justify-between items-center px-3.5 py-2.5 rounded-xl ${col.headerBg} border border-white/5`}>
