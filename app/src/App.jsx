@@ -213,24 +213,6 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [session?.user?.id, workspaceReady, staffList, departments, categoryTypes, tasks]);
 
-  if (isSupabaseConfigured && authLoading) return <div className="min-h-screen grid place-items-center bg-slate-950 text-slate-200">Đang kết nối Supabase…</div>;
-  if (isSupabaseConfigured && !session) return (
-    <main className="min-h-screen grid place-items-center bg-slate-950 px-4 text-slate-100">
-      <form onSubmit={handleCloudLogin} className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-7 shadow-2xl space-y-4">
-        <div className="text-blue-400 text-sm font-semibold">ĐỒNG BỘ ĐA THIẾT BỊ</div>
-        <h1 className="text-2xl font-bold">Đăng nhập MAMOS</h1>
-        <p className="text-sm text-slate-400">Dùng tài khoản đã tạo trong Supabase Auth để mở workspace chung.</p>
-        <input className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" type="email" autoComplete="username" placeholder="Email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required />
-        <input className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" type="password" autoComplete="current-password" placeholder="Mật khẩu" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
-        {loginError && <p className="text-sm text-red-400">{loginError}</p>}
-        <button className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold hover:bg-blue-500">Đăng nhập</button>
-        <p className="text-xs text-slate-500">Tài khoản được quản lý trong Supabase; website không cho đăng ký tự do.</p>
-      </form>
-    </main>
-  );
-  if (isSupabaseConfigured && (workspaceLoading || !workspaceReady) && !cloudError) return <div className="min-h-screen grid place-items-center bg-slate-950 text-slate-200">Đang tải workspace…</div>;
-  if (isSupabaseConfigured && cloudError && !workspaceReady) return <main className="min-h-screen grid place-items-center bg-slate-950 px-4 text-slate-100"><div className="max-w-xl rounded-2xl border border-red-900 bg-slate-900 p-6"><h1 className="text-xl font-bold">Chưa thể kết nối dữ liệu</h1><p className="mt-3 text-sm text-slate-300">{cloudError}</p><button className="mt-5 rounded-lg bg-slate-700 px-4 py-2" onClick={() => supabase.auth.signOut()}>Đăng xuất</button></div></main>;
-
   const handlePriorityChange = (priority) => {
     let defaultHours = 4;
     if (priority.includes('P1')) defaultHours = 0.5;
@@ -397,6 +379,24 @@ export default function App() {
       setPassError(true);
     }
   };
+
+  if (isSupabaseConfigured && authLoading) return <div className="min-h-screen grid place-items-center bg-slate-950 text-slate-200">Đang kết nối Supabase…</div>;
+  if (isSupabaseConfigured && !session) return (
+    <main className="min-h-screen grid place-items-center bg-slate-950 px-4 text-slate-100">
+      <form onSubmit={handleCloudLogin} className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-7 shadow-2xl space-y-4">
+        <div className="text-blue-400 text-sm font-semibold">ĐỒNG BỘ ĐA THIẾT BỊ</div>
+        <h1 className="text-2xl font-bold">Đăng nhập MAMOS</h1>
+        <p className="text-sm text-slate-400">Dùng tài khoản đã tạo trong Supabase Auth để mở workspace chung.</p>
+        <input className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" type="email" autoComplete="username" placeholder="Email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required />
+        <input className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" type="password" autoComplete="current-password" placeholder="Mật khẩu" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
+        {loginError && <p className="text-sm text-red-400">{loginError}</p>}
+        <button className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold hover:bg-blue-500">Đăng nhập</button>
+        <p className="text-xs text-slate-500">Tài khoản được quản lý trong Supabase; website không cho đăng ký tự do.</p>
+      </form>
+    </main>
+  );
+  if (isSupabaseConfigured && (workspaceLoading || !workspaceReady) && !cloudError) return <div className="min-h-screen grid place-items-center bg-slate-950 text-slate-200">Đang tải workspace…</div>;
+  if (isSupabaseConfigured && cloudError && !workspaceReady) return <main className="min-h-screen grid place-items-center bg-slate-950 px-4 text-slate-100"><div className="max-w-xl rounded-2xl border border-red-900 bg-slate-900 p-6"><h1 className="text-xl font-bold">Chưa thể kết nối dữ liệu</h1><p className="mt-3 text-sm text-slate-300">{cloudError}</p><button className="mt-5 rounded-lg bg-slate-700 px-4 py-2" onClick={() => supabase.auth.signOut()}>Đăng xuất</button></div></main>;
 
   return (
     <div className={`min-h-screen w-full font-sans antialiased transition-colors duration-200 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
