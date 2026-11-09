@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { isSupabaseConfigured, supabase, EMPTY_WORKSPACE } from './lib/supabase';
 import { 
   LayoutDashboard, 
   CheckSquare, 
@@ -39,6 +40,36 @@ const getVnDateTimeString = () => {
 };
 
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [cloudError, setCloudError] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [workspaceReady, setWorkspaceReady] = useState(!isSupabaseConfigured);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return undefined;
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error) setLoginError(error.message);
+      setSession(data?.session ?? null);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setLoginError('');
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleCloudLogin = async (event) => {
+    event.preventDefault();
+    setLoginError('');
+    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail.trim(), password: loginPassword });
+    if (error) setLoginError('Không đăng nhập được. Kiểm tra email, mật khẩu và tài khoản Supabase đã được tạo.');
+  };
+
   const [activeTab, setActiveTab] = useState('kanban');
   const [activeCategorySubTab, setActiveCategorySubTab] = useState('staff');
   const [darkMode, setDarkMode] = useState(true);
@@ -131,10 +162,74 @@ export default function App() {
   const [newDeptInput, setNewDeptInput] = useState('');
   const [newCatInput, setNewCatInput] = useState('');
 
-  useEffect(() => { localStorage.setItem('demo_staff', JSON.stringify(staffList)); }, [staffList]);
-  useEffect(() => { localStorage.setItem('demo_departments', JSON.stringify(departments)); }, [departments]);
-  useEffect(() => { localStorage.setItem('demo_category_types', JSON.stringify(categoryTypes)); }, [categoryTypes]);
-  useEffect(() => { localStorage.setItem('demo_tasks', JSON.stringify(tasks)); }, [tasks]);
+  useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_staff', JSON.stringify(staffList)); }, [staffList]);
+  useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_departments', JSON.stringify(departments)); }, [departments]);
+  useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_category_types', JSON.stringify(categoryTypes)); }, [categoryTypes]);
+  useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_tasks', JSON.stringify(tasks)); }, [tasks]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.user?.id) {
+      setWorkspaceReady(!isSupabaseConfigured);
+      return undefined;
+    }
+    let active = true;
+    setWorkspaceLoading(true);
+    setWorkspaceReady(false);
+    setCloudError('');
+    (async () => {
+      const { data, error } = await supabase.from('workspace_state').select('data').eq('id', 'main').maybeSingle();
+      if (error) throw error;
+      let workspace = data?.data;
+      if (!workspace) {
+        const { data: created, error: createError } = await supabase.from('workspace_state')
+          .insert({ id: 'main', data: EMPTY_WORKSPACE, updated_by: session.user.id }).select('data').single();
+        if (createError) throw createError;
+        workspace = created.data;
+      }
+      if (!active) return;
+      setStaffList(Array.isArray(workspace.staff) ? workspace.staff : []);
+      setDepartments(Array.isArray(workspace.departments) ? workspace.departments : []);
+      setCategoryTypes(Array.isArray(workspace.categoryTypes) ? workspace.categoryTypes : []);
+      setTasks(Array.isArray(workspace.tasks) ? workspace.tasks : []);
+      setWorkspaceReady(true);
+    })().catch((error) => {
+      if (active) setCloudError(error.message || 'Không thể tải dữ liệu cloud. Hãy kiểm tra SQL/RLS trong Supabase.');
+    }).finally(() => { if (active) setWorkspaceLoading(false); });
+    return () => { active = false; };
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.user?.id || !workspaceReady) return undefined;
+    const timer = setTimeout(async () => {
+      const { error } = await supabase.from('workspace_state').upsert({
+        id: 'main',
+        data: { staff: staffList, departments, categoryTypes, tasks },
+        updated_by: session.user.id,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) setCloudError('Không lưu được lên cloud. ' + error.message);
+      else setCloudError('');
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [session?.user?.id, workspaceReady, staffList, departments, categoryTypes, tasks]);
+
+  if (isSupabaseConfigured && authLoading) return <div className="min-h-screen grid place-items-center bg-slate-950 text-slate-200">Đang kết nối Supabase…</div>;
+  if (isSupabaseConfigured && !session) return (
+    <main className="min-h-screen grid place-items-center bg-slate-950 px-4 text-slate-100">
+      <form onSubmit={handleCloudLogin} className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-7 shadow-2xl space-y-4">
+        <div className="text-blue-400 text-sm font-semibold">ĐỒNG BỘ ĐA THIẾT BỊ</div>
+        <h1 className="text-2xl font-bold">Đăng nhập MAMOS</h1>
+        <p className="text-sm text-slate-400">Dùng tài khoản đã tạo trong Supabase Auth để mở workspace chung.</p>
+        <input className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" type="email" autoComplete="username" placeholder="Email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required />
+        <input className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3" type="password" autoComplete="current-password" placeholder="Mật khẩu" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
+        {loginError && <p className="text-sm text-red-400">{loginError}</p>}
+        <button className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold hover:bg-blue-500">Đăng nhập</button>
+        <p className="text-xs text-slate-500">Tài khoản được quản lý trong Supabase; website không cho đăng ký tự do.</p>
+      </form>
+    </main>
+  );
+  if (isSupabaseConfigured && (workspaceLoading || !workspaceReady) && !cloudError) return <div className="min-h-screen grid place-items-center bg-slate-950 text-slate-200">Đang tải workspace…</div>;
+  if (isSupabaseConfigured && cloudError && !workspaceReady) return <main className="min-h-screen grid place-items-center bg-slate-950 px-4 text-slate-100"><div className="max-w-xl rounded-2xl border border-red-900 bg-slate-900 p-6"><h1 className="text-xl font-bold">Chưa thể kết nối dữ liệu</h1><p className="mt-3 text-sm text-slate-300">{cloudError}</p><button className="mt-5 rounded-lg bg-slate-700 px-4 py-2" onClick={() => supabase.auth.signOut()}>Đăng xuất</button></div></main>;
 
   const handlePriorityChange = (priority) => {
     let defaultHours = 4;
@@ -305,6 +400,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen w-full font-sans antialiased transition-colors duration-200 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+      {cloudError && <div role="status" className="bg-amber-950 px-4 py-2 text-center text-xs text-amber-200">{cloudError}</div>}
       <header className={`sticky top-0 z-40 w-full border-b backdrop-blur-xl ${darkMode ? 'bg-slate-900/85 border-slate-800/80 shadow-lg shadow-black/20' : 'bg-white/85 border-slate-200/80 shadow-sm'}`}>
         <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -314,7 +410,7 @@ export default function App() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-bold text-base sm:text-lg tracking-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Quản lý công việc</h1>
-                <span className="hidden sm:inline-block px-2.5 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20">Bản demo</span>
+                <span className="hidden sm:inline-block px-2.5 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20">Đồng bộ Supabase</span>
               </div>
             </div>
           </div>
@@ -353,6 +449,8 @@ export default function App() {
             </button>
 
             <div className={`h-6 w-[1px] ${darkMode ? 'bg-slate-800' : 'bg-slate-200'} mx-1`}></div>
+
+            <button onClick={() => supabase.auth.signOut()} className={`rounded-xl border px-3 py-2 text-xs ${darkMode ? 'border-slate-800 text-slate-300 hover:bg-slate-800' : 'border-slate-200 text-slate-700 hover:bg-slate-100'}`} title={session?.user?.email || 'Đăng xuất'}>Đăng xuất</button>
 
             <button 
               onClick={() => setDarkMode(!darkMode)}
