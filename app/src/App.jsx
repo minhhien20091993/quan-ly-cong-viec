@@ -294,7 +294,7 @@ export default function App() {
 
   const handleVerifyPass = (e) => {
     e.preventDefault();
-    if (categoryPassInput === 'DEMO-ONLY') {
+    if (categoryPassInput === '761311') {
       setIsCategoryUnlocked(true);
       setPassError(false);
       setCategoryPassInput('');
@@ -314,7 +314,7 @@ export default function App() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="font-bold text-base sm:text-lg tracking-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">Quản lý công việc</h1>
-                <span className="hidden sm:inline-block px-2.5 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20">Mẫu thử local</span>
+                <span className="hidden sm:inline-block px-2.5 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-400 rounded-full border border-blue-500/20">Bản demo</span>
               </div>
             </div>
           </div>
@@ -772,7 +772,7 @@ export default function App() {
                 {activeCategorySubTab === 'staff' && (
                   <div>
                     <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-sm sm:text-base flex items-center gap-2"><Users className="w-4 h-4 text-blue-400"/> Danh sách Nhân sự Mẫu thử local</h3>
+                      <h3 className="font-bold text-sm sm:text-base flex items-center gap-2"><Users className="w-4 h-4 text-blue-400"/> Danh sách nhân sự mẫu</h3>
                       <button onClick={() => { setEditingStaff(null); setStaffForm({ name: '', role: '', email: '', phone: '' }); setIsStaffModalOpen(true); }} className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-medium shadow flex items-center gap-1.5"><Plus className="w-4 h-4"/> Thêm nhân sự</button>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

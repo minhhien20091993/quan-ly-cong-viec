@@ -9,6 +9,6 @@ A local task-management dashboard built with React and Vite. The included record
 3. Run `npm install` once, then `npm run dev -- --host 127.0.0.1`.
 4. Open the local URL shown by Vite. The app stores demo data in the browser's local storage.
 
-The demo category gate uses `DEMO-ONLY`. It is a client-side demonstration only and is not a security control. Do not enter real personal, organizational, patient, or confidential data.
+The demo category gate uses `761311`. It runs in the browser and is only a demonstration; it is not a security control. Anyone can inspect the public source code. Do not enter real personal, organizational, patient, or confidential data.
 
 No AI/API integration is included. The app does not need an API key.
