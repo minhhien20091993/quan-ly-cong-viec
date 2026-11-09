@@ -4,6 +4,6 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/personal-task-manager-demo/',
+  base: '/quan-ly-cong-viec/',
   plugins: [react(), tailwindcss()],
 })
