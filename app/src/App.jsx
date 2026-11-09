@@ -48,6 +48,15 @@ const getLocalDateString = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+const getTaskDateLabel = (task) => {
+  const dateValue = task.scheduledDate || task.dateTime?.split('T')[0];
+  if (!dateValue) return 'Chưa có ngày';
+  const parsedDate = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) return 'Chưa có ngày';
+  const formattedDate = parsedDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `${task.scheduledDate ? 'Dự kiến' : 'Ghi nhận'} ${formattedDate}`;
+};
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
@@ -768,6 +777,10 @@ export default function App() {
                           <div>
                             <h4 className="font-semibold text-sm leading-snug">{task.title}</h4>
                             {task.description && <p className="text-xs text-slate-400 line-clamp-2 mt-1">{task.description}</p>}
+                            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
+                              <Calendar className="h-3.5 w-3.5 text-blue-400"/>
+                              <span>{getTaskDateLabel(task)}</span>
+                            </div>
                           </div>
 
                           <div className="flex flex-wrap gap-1.5 items-center justify-between">
