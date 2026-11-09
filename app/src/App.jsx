@@ -735,6 +735,24 @@ export default function App() {
               const colTasks = filteredTasks
                 .filter(t => t.status === col.id)
                 .sort((a, b) => {
+                  if (col.id === 'In Progress') {
+                    const now = Date.now();
+                    const getRemainingMs = (task) => task.startTimestamp
+                      ? ((Number(task.estimatedHours) || 1) * 3600000) - (now - task.startTimestamp)
+                      : Number.POSITIVE_INFINITY;
+                    const getPriorityRank = (task) => {
+                      if (task.priority?.includes('P1')) return 1;
+                      if (task.priority?.includes('P2')) return 2;
+                      if (task.priority?.includes('P3')) return 3;
+                      if (task.priority?.includes('P4')) return 4;
+                      return 5;
+                    };
+                    const remainingA = getRemainingMs(a);
+                    const remainingB = getRemainingMs(b);
+                    if (remainingA !== remainingB) return remainingA < remainingB ? -1 : 1;
+                    const priorityDifference = getPriorityRank(a) - getPriorityRank(b);
+                    if (priorityDifference !== 0) return priorityDifference;
+                  }
                   const dateA = a.scheduledDate || a.dateTime?.split('T')[0] || '9999-12-31';
                   const dateB = b.scheduledDate || b.dateTime?.split('T')[0] || '9999-12-31';
                   return dateA.localeCompare(dateB) || (a.dateTime || '').localeCompare(b.dateTime || '');
