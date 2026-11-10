@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { isSupabaseConfigured, supabase, EMPTY_WORKSPACE } from './lib/supabase';
+import AssetManagement from './components/AssetManagement';
 import { 
   LayoutDashboard, 
   CheckSquare, 
@@ -161,6 +162,10 @@ export default function App() {
       }
     ];
   });
+  const [assets, setAssets] = useState(() => {
+    const saved = localStorage.getItem('demo_assets');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -190,6 +195,7 @@ export default function App() {
   useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_departments', JSON.stringify(departments)); }, [departments]);
   useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_category_types', JSON.stringify(categoryTypes)); }, [categoryTypes]);
   useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_tasks', JSON.stringify(tasks)); }, [tasks]);
+  useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_assets', JSON.stringify(assets)); }, [assets]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !session?.user?.id) {
@@ -215,6 +221,7 @@ export default function App() {
       setDepartments(Array.isArray(workspace.departments) ? workspace.departments : []);
       setCategoryTypes(Array.isArray(workspace.categoryTypes) ? workspace.categoryTypes : []);
       setTasks(Array.isArray(workspace.tasks) ? workspace.tasks : []);
+      setAssets(Array.isArray(workspace.assets) ? workspace.assets : []);
       setWorkspaceReady(true);
     })().catch((error) => {
       if (active) setCloudError(error.message || 'Không thể tải dữ liệu cloud. Hãy kiểm tra SQL/RLS trong Supabase.');
@@ -227,7 +234,7 @@ export default function App() {
     const timer = setTimeout(async () => {
       const { error } = await supabase.from('workspace_state').upsert({
         id: 'main',
-        data: { staff: staffList, departments, categoryTypes, tasks },
+        data: { staff: staffList, departments, categoryTypes, tasks, assets },
         updated_by: session.user.id,
         updated_at: new Date().toISOString(),
       });
@@ -235,7 +242,7 @@ export default function App() {
       else setCloudError('');
     }, 500);
     return () => clearTimeout(timer);
-  }, [session?.user?.id, workspaceReady, staffList, departments, categoryTypes, tasks]);
+  }, [session?.user?.id, workspaceReady, staffList, departments, categoryTypes, tasks, assets]);
 
   const handlePriorityChange = (priority) => {
     let defaultHours = 4;
@@ -331,15 +338,22 @@ export default function App() {
     .filter(task => (task.scheduledDate || task.dateTime?.split('T')[0]) === calendarSelectedDate)
     .sort((a, b) => (a.dateTime || '').localeCompare(b.dateTime || ''));
 
-  const openNewTask = (scheduledDate = getLocalDateString()) => {
+  const openNewTask = (scheduledDate = getLocalDateString(), linkedAsset = null) => {
     setEditingTask(null);
     setTaskForm({
-      title: '', description: '', assignee: staffList[0]?.name || '', priority: 'P3 - Trung bình',
-      status: 'Todo', department: departments[0] || '', estimatedHours: 4,
-      dateTime: getVnDateTimeString(), scheduledDate, comments: []
+      title: linkedAsset ? `Kiểm tra / xử lý: ${linkedAsset.name}` : '',
+      description: linkedAsset ? `Tài sản ${linkedAsset.code} - ${linkedAsset.name}${linkedAsset.location ? `\nVị trí: ${linkedAsset.location}` : ''}` : '',
+      assignee: staffList[0]?.name || '', priority: 'P3 - Trung bình', status: 'Todo',
+      department: linkedAsset?.department || departments[0] || '', estimatedHours: 4,
+      dateTime: getVnDateTimeString(), scheduledDate, assetId: linkedAsset?.id || '', comments: []
     });
     setIsTaskModalOpen(true);
   };
+
+  const saveAsset = (asset) => setAssets(previous => {
+    const exists = previous.some(item => item.id === asset.id);
+    return exists ? previous.map(item => item.id === asset.id ? asset : item) : [asset, ...previous];
+  });
 
   const handleQuickStatusChange = (taskId, newStatus) => {
     setTasks(tasks.map(t => {
@@ -559,8 +573,9 @@ export default function App() {
 
         <div className={`flex min-w-0 flex-col gap-3 rounded-2xl border p-3 sm:gap-4 sm:p-4 ${darkMode ? 'bg-slate-900/40 border-slate-800/80 shadow-xl' : 'bg-white border-slate-200 shadow-sm'}`}>
           <div className="flex min-w-0 flex-col items-stretch justify-between gap-3 lg:flex-row lg:items-center">
-            <div className={`grid w-full min-w-0 grid-cols-4 gap-1 rounded-xl p-1 sm:flex sm:w-auto ${darkMode ? 'bg-slate-950/80 border border-slate-800/80' : 'bg-slate-100'}`}>
+            <div className={`grid w-full min-w-0 grid-cols-5 gap-1 rounded-xl p-1 sm:flex sm:w-auto ${darkMode ? 'bg-slate-950/80 border border-slate-800/80' : 'bg-slate-100'}`}>
               <button
+                aria-label="Xem lịch công việc"
                 onClick={() => setActiveTab('calendar')}
                 className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[10px] font-medium transition-all sm:flex-none sm:gap-2 sm:px-4 sm:text-sm ${
                   activeTab === 'calendar' ? 'bg-blue-600 text-white shadow-md' : darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600'
@@ -569,32 +584,44 @@ export default function App() {
                 <Calendar className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span>Lịch</span>
               </button>
               <button
+                aria-label="Xem bảng Kanban"
                 onClick={() => setActiveTab('kanban')}
                 className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[10px] font-medium transition-all sm:flex-none sm:gap-2 sm:px-4 sm:text-sm ${
                   activeTab === 'kanban' ? 'bg-blue-600 text-white shadow-md' : darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600'
                 }`}
               >
-                <LayoutDashboard className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span>Kanban</span>
+                <LayoutDashboard className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span className="sm:hidden">Bảng</span><span className="hidden sm:inline">Kanban</span>
               </button>
               <button
+                aria-label="Xem danh sách công việc"
                 onClick={() => setActiveTab('list')}
                 className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[10px] font-medium transition-all sm:flex-none sm:gap-2 sm:px-4 sm:text-sm ${
                   activeTab === 'list' ? 'bg-blue-600 text-white shadow-md' : darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600'
                 }`}
               >
-                <CheckSquare className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span>Danh sách</span>
+                <CheckSquare className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span className="sm:hidden">DS</span><span className="hidden sm:inline">Danh sách</span>
               </button>
               <button
+                aria-label="Xem thống kê và lịch sử"
                 onClick={() => setActiveTab('analytics')}
                 className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[10px] font-medium transition-all sm:flex-none sm:gap-2 sm:px-4 sm:text-sm ${
                   activeTab === 'analytics' ? 'bg-blue-600 text-white shadow-md' : darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600'
                 }`}
               >
-                <BarChart3 className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span className="sm:hidden">Thống kê</span><span className="hidden sm:inline">Thống kê &amp; Lịch sử</span>
+                <BarChart3 className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span className="sm:hidden">BC</span><span className="hidden sm:inline">Thống kê &amp; Lịch sử</span>
+              </button>
+              <button
+                aria-label="Quản lý tài sản"
+                onClick={() => setActiveTab('assets')}
+                className={`flex min-w-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-2 text-[10px] font-medium transition-all sm:flex-none sm:gap-2 sm:px-4 sm:text-sm ${
+                  activeTab === 'assets' ? 'bg-blue-600 text-white shadow-md' : darkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600'
+                }`}
+              >
+                <Building2 className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4"/> <span className="sm:hidden">TS</span><span className="hidden sm:inline">Tài sản</span>
               </button>
             </div>
 
-            {activeTab !== 'category' && (
+            {activeTab !== 'category' && activeTab !== 'assets' && (
               <div className="relative w-full min-w-0 lg:max-w-xs">
                 <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400"/>
                 <input 
@@ -608,7 +635,7 @@ export default function App() {
             )}
           </div>
 
-          {activeTab !== 'category' && (
+          {activeTab !== 'category' && activeTab !== 'assets' && (
             <div className="grid grid-cols-2 items-center gap-2 border-t border-slate-800/40 pt-3 sm:flex sm:flex-wrap sm:gap-2.5">
               <span className="col-span-2 mr-1 flex items-center gap-1.5 text-xs font-medium text-slate-400 sm:col-span-1">
                 <SlidersHorizontal className="w-3.5 h-3.5 text-blue-400"/> Lọc nhanh:
@@ -663,6 +690,16 @@ export default function App() {
             </div>
           )}
         </div>
+
+        {activeTab === 'assets' && (
+          <AssetManagement
+            assets={assets}
+            darkMode={darkMode}
+            currentUserLabel={session?.user?.email || 'Bản demo'}
+            onSave={saveAsset}
+            onCreateTask={(asset) => { setActiveTab('kanban'); openNewTask(getLocalDateString(), asset); }}
+          />
+        )}
 
         {activeTab === 'calendar' && (
           <section className={`overflow-hidden rounded-2xl border ${darkMode ? 'border-slate-800 bg-slate-900/40 shadow-xl' : 'border-slate-200 bg-white shadow-sm'}`}>
@@ -768,6 +805,7 @@ export default function App() {
 
                   <div className="flex flex-col gap-3">
                     {colTasks.map(task => {
+                      const linkedAsset = task.assetId ? assets.find(asset => asset.id === task.assetId) : null;
                       const currentSpent = calculateTaskHours(task);
                       const estHours = parseFloat(task.estimatedHours || 1);
                       const percent = Math.min(Math.round((currentSpent / estHours) * 100), 100);
@@ -805,6 +843,7 @@ export default function App() {
                               <Calendar className="h-3.5 w-3.5 text-blue-400"/>
                               <span>{getTaskDateLabel(task)}</span>
                             </div>
+                            {linkedAsset && <div className="mt-1 flex items-center gap-1.5 text-[11px] text-cyan-300"><Building2 className="h-3.5 w-3.5"/><span className="truncate">{linkedAsset.code} · {linkedAsset.name}</span></div>}
                           </div>
 
                           <div className="flex flex-wrap gap-1.5 items-center justify-between">
@@ -1176,6 +1215,7 @@ export default function App() {
             </div>
             
             <form onSubmit={handleSaveTask} className="flex-1 min-h-0 overflow-y-auto px-5 py-5 sm:px-7 space-y-5 overscroll-contain">
+              {taskForm.assetId && assets.find(asset => asset.id === taskForm.assetId) && <div className={`rounded-xl border px-3.5 py-3 text-xs ${darkMode ? 'border-cyan-900/70 bg-cyan-950/30 text-cyan-200' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}`}><span className="font-semibold">Tài sản liên quan:</span> {assets.find(asset => asset.id === taskForm.assetId)?.code} · {assets.find(asset => asset.id === taskForm.assetId)?.name}</div>}
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Tiêu đề công việc / Sự cố *</label>
                 <input 

@@ -12,4 +12,5 @@ export const EMPTY_WORKSPACE = {
   departments: [],
   categoryTypes: [],
   tasks: [],
+  assets: [],
 };
