@@ -433,7 +433,8 @@ def process_text() -> str:
         if rows:
             return str((rows[0].get("value") or {}).get("text", DEFAULT_PROCESS))
         text = DEFAULT_PROCESS
-        _session_db_request("/rest/v1/office_ai_settings?on_conflict=id", "POST", {"id": "process", "value": {"text": text}})
+        _session_db_request("/rest/v1/office_ai_settings?on_conflict=id", "POST", {
+            "id": "process", "value": {"text": text}, "updated_at": datetime.now().isoformat(timespec="seconds")})
         return text
     if not PROC_FILE.exists():
         PROC_FILE.write_text(DEFAULT_PROCESS, encoding="utf-8")
@@ -442,7 +443,8 @@ def process_text() -> str:
 
 def save_process(text: str):
     if SUPABASE_SESSION_STORAGE:
-        _session_db_request("/rest/v1/office_ai_settings?on_conflict=id", "POST", {"id": "process", "value": {"text": text}})
+        _session_db_request("/rest/v1/office_ai_settings?on_conflict=id", "POST", {
+            "id": "process", "value": {"text": text}, "updated_at": datetime.now().isoformat(timespec="seconds")})
         return
     PROC_FILE.write_text(text, encoding="utf-8")
 
@@ -462,7 +464,8 @@ def spath(sid):
 
 def save(s):
     if SUPABASE_SESSION_STORAGE:
-        _session_db_request("/rest/v1/office_ai_sessions?on_conflict=id", "POST", {"id": s["id"], "session": s})
+        _session_db_request("/rest/v1/office_ai_sessions?on_conflict=id", "POST", {
+            "id": s["id"], "session": s, "updated_at": datetime.now().isoformat(timespec="seconds")})
         return
     spath(s["id"]).write_text(json.dumps(s, ensure_ascii=False, indent=1), encoding="utf-8")
 
