@@ -10,6 +10,7 @@ Giao diện:  index.html + scene3d.js (cảnh 3D bằng Three.js; tự dùng c�
 Cấu hình:   sao chép .env.example thành .env và điền ANTHROPIC_API_KEY
 """
 import asyncio, base64, binascii, io, json, os, random, re, time
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -30,6 +31,7 @@ WEB_SEARCH = os.getenv("WEB_SEARCH", "0") == "1"
 HOSPITAL = os.getenv("HOSPITAL_NAME", "").strip()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
 SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "").strip()
+SUPABASE_SESSION_STORAGE = os.getenv("SUPABASE_SESSION_STORAGE", "0") == "1"
 
 DATA = Path(os.getenv("DATA_DIR", str(BASE / "data"))).expanduser()
 if not DATA.is_absolute():
@@ -234,9 +236,10 @@ app = FastAPI()
 _jobs: set = set()
 _queues: dict = {}
 _locks: dict = {}   # mỗi phiên một khóa để các lượt trao đổi không ghi chồng lên nhau
+_current_access_token = ContextVar("office_ai_access_token", default=None)
 
 
-def _supabase_request(path: str, method: str, token: str, payload=None):
+def _supabase_request(path: str, method: str, token: str, payload=None, extra_headers=None):
     """Xác minh phiên và quyền bằng access token của chính người dùng, không dùng service-role key."""
     body = json.dumps(payload).encode("utf-8") if payload is not None else None
     req = URLRequest(
@@ -247,6 +250,7 @@ def _supabase_request(path: str, method: str, token: str, payload=None):
             "apikey": SUPABASE_PUBLISHABLE_KEY,
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
+            **(extra_headers or {}),
         },
     )
     try:
@@ -279,7 +283,11 @@ async def require_supabase_ai_access(request: Request, call_next):
         return JSONResponse({"error": "Chưa kiểm tra được quyền Văn phòng AI. Hãy chạy migration quyền trong Supabase."}, status_code=503)
     if raw_access.strip().lower() != b"true":
         return JSONResponse({"error": "Tài khoản chưa được cấp quyền truy cập Văn phòng AI."}, status_code=403)
-    return await call_next(request)
+    context_token = _current_access_token.set(token.strip())
+    try:
+        return await call_next(request)
+    finally:
+        _current_access_token.reset(context_token)
 
 
 # ---------- tệp đính kèm ----------
@@ -405,10 +413,38 @@ def file_blocks(files):
 
 
 # ---------- quy trình chung & phiên ----------
+def _session_db_request(path: str, method: str, payload=None):
+    if not SUPABASE_SESSION_STORAGE:
+        return None
+    token = _current_access_token.get()
+    if not token:
+        raise RuntimeError("Không có phiên đăng nhập để truy cập dữ liệu Supabase.")
+    headers = {"Prefer": "resolution=merge-duplicates,return=minimal"} if method == "POST" else {}
+    status, raw = _supabase_request(path, method, token, payload, headers)
+    if status >= 400:
+        raise RuntimeError(f"Supabase từ chối thao tác lưu trữ (HTTP {status}). Hãy kiểm tra migration office_ai_storage.sql và quyền truy cập.")
+    return raw
+
+
 def process_text() -> str:
+    if SUPABASE_SESSION_STORAGE:
+        raw = _session_db_request("/rest/v1/office_ai_settings?id=eq.process&select=value&limit=1", "GET")
+        rows = json.loads(raw or b"[]")
+        if rows:
+            return str((rows[0].get("value") or {}).get("text", DEFAULT_PROCESS))
+        text = DEFAULT_PROCESS
+        _session_db_request("/rest/v1/office_ai_settings?on_conflict=id", "POST", {"id": "process", "value": {"text": text}})
+        return text
     if not PROC_FILE.exists():
         PROC_FILE.write_text(DEFAULT_PROCESS, encoding="utf-8")
     return PROC_FILE.read_text(encoding="utf-8")
+
+
+def save_process(text: str):
+    if SUPABASE_SESSION_STORAGE:
+        _session_db_request("/rest/v1/office_ai_settings?on_conflict=id", "POST", {"id": "process", "value": {"text": text}})
+        return
+    PROC_FILE.write_text(text, encoding="utf-8")
 
 
 def ctx_block() -> str:
@@ -425,21 +461,50 @@ def spath(sid):
 
 
 def save(s):
+    if SUPABASE_SESSION_STORAGE:
+        _session_db_request("/rest/v1/office_ai_sessions?on_conflict=id", "POST", {"id": s["id"], "session": s})
+        return
     spath(s["id"]).write_text(json.dumps(s, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def load(sid):
-    if not re.fullmatch(r"[\d-]+", sid) or not spath(sid).exists():
+    if not re.fullmatch(r"[\d-]+", sid):
+        return None
+    if SUPABASE_SESSION_STORAGE:
+        raw = _session_db_request(f"/rest/v1/office_ai_sessions?id=eq.{sid}&select=session&limit=1", "GET")
+        rows = json.loads(raw or b"[]")
+        return rows[0].get("session") if rows else None
+    if not spath(sid).exists():
         return None
     return json.loads(spath(sid).read_text(encoding="utf-8"))
 
 
+def delete_session(sid):
+    if SUPABASE_SESSION_STORAGE:
+        _session_db_request(f"/rest/v1/office_ai_sessions?id=eq.{sid}", "DELETE")
+        return
+    if spath(sid).exists():
+        spath(sid).unlink()
+
+
+def list_sessions():
+    if SUPABASE_SESSION_STORAGE:
+        raw = _session_db_request("/rest/v1/office_ai_sessions?select=session&order=updated_at.desc", "GET")
+        return [row.get("session") for row in json.loads(raw or b"[]") if isinstance(row.get("session"), dict)]
+    out = []
+    for f in sorted((DATA / "sessions").glob("*.json"), reverse=True):
+        try:
+            out.append(json.loads(f.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    return out
+
+
 def new_session(request_text):
-    base, n = datetime.now().strftime("%Y%m%d-%H%M%S"), 0
-    sid = base
-    while spath(sid).exists():
-        n += 1
-        sid = f"{base}-{n}"
+    base = datetime.now().strftime("%Y%m%d-%H%M%S")
+    sid = f"{base}-{random.randrange(10000, 100000)}"
+    while load(sid):
+        sid = f"{base}-{random.randrange(10000, 100000)}"
     return {"id": sid, "created": datetime.now().isoformat(timespec="seconds"), "request": request_text,
             "status": "running", "type": "", "type_label": "", "files": [], "digest": "",
             "tasks": {}, "results": {}, "report_md": "", "error": ""}
@@ -870,21 +935,17 @@ async def put_process(request: Request):
         return JSONResponse({"error": "Dữ liệu gửi lên không hợp lệ."}, status_code=400)
     if not isinstance(body, dict):
         return JSONResponse({"error": "Dữ liệu gửi lên phải là một đối tượng JSON."}, status_code=400)
-    PROC_FILE.write_text(str(body.get("text", "")), encoding="utf-8")
+    save_process(str(body.get("text", "")))
     return {"ok": True}
 
 
 @app.get("/sessions")
 async def sessions():
     out = []
-    for f in sorted((DATA / "sessions").glob("*.json"), reverse=True):
-        try:
-            s = json.loads(f.read_text(encoding="utf-8"))
-            out.append({k: s.get(k) for k in ("id", "created", "request", "status", "type_label")}
-                       | {"has_report": bool(s.get("report_md")), "nfiles": len(s.get("files") or []),
-                          "nchat": len(s.get("chat") or []) // 2})
-        except Exception:
-            continue
+    for s in list_sessions():
+        out.append({k: s.get(k) for k in ("id", "created", "request", "status", "type_label")}
+                   | {"has_report": bool(s.get("report_md")), "nfiles": len(s.get("files") or []),
+                      "nchat": len(s.get("chat") or []) // 2})
     return out
 
 
@@ -897,7 +958,7 @@ async def session_get(sid: str):
 @app.delete("/sessions/{sid}")
 async def session_delete(sid: str):
     if load(sid):
-        spath(sid).unlink()
+        delete_session(sid)
     _locks.pop(sid, None)
     return {"ok": True}
 
