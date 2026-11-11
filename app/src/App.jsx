@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { isSupabaseConfigured, supabase, EMPTY_WORKSPACE } from './lib/supabase';
 import AssetManagement from './components/AssetManagement';
+import OfficeAiAccess from './components/OfficeAiAccess';
 import { 
   LayoutDashboard, 
   CheckSquare, 
@@ -67,6 +68,8 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [workspaceReady, setWorkspaceReady] = useState(!isSupabaseConfigured);
+  const [isOfficeAiAdmin, setIsOfficeAiAdmin] = useState(false);
+  const [officeAiAccessOpen, setOfficeAiAccessOpen] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return undefined;
@@ -81,6 +84,18 @@ export default function App() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !session?.user?.id) {
+      setIsOfficeAiAdmin(false);
+      return undefined;
+    }
+    let active = true;
+    supabase.from('office_ai_admins').select('user_id').eq('user_id', session.user.id).maybeSingle()
+      .then(({ data }) => { if (active) setIsOfficeAiAdmin(Boolean(data)); })
+      .catch(() => { if (active) setIsOfficeAiAdmin(false); });
+    return () => { active = false; };
+  }, [session?.user?.id]);
 
   const handleCloudLogin = async (event) => {
     event.preventDefault();
@@ -512,6 +527,13 @@ export default function App() {
               <FolderTree className="w-4 h-4 text-blue-400"/>
               <span className="hidden md:inline">Quản lý</span> Danh mục
             </button>
+
+            {isOfficeAiAdmin && <button
+              onClick={() => setOfficeAiAccessOpen(true)}
+              className={`flex min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-2.5 py-2 text-xs font-medium transition-all sm:px-3.5 sm:text-sm ${darkMode ? 'border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20' : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'}`}
+            >
+              <ShieldCheck className="h-4 w-4"/><span className="hidden md:inline">Quyền</span> Văn phòng AI
+            </button>}
 
             <button 
               onClick={() => openNewTask(activeTab === 'calendar' ? calendarSelectedDate : getLocalDateString())}
@@ -1214,6 +1236,8 @@ export default function App() {
         )}
 
       </main>
+
+      {officeAiAccessOpen && <OfficeAiAccess darkMode={darkMode} onClose={() => setOfficeAiAccessOpen(false)}/>}
 
       {isTaskModalOpen && (
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50 animate-fade-in">
