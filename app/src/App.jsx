@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { isSupabaseConfigured, supabase, EMPTY_WORKSPACE } from './lib/supabase';
+import { isSupabaseConfigured, supabase, EMPTY_WORKSPACE, officeAiUrl } from './lib/supabase';
 import AssetManagement from './components/AssetManagement';
 import OfficeAiAccess from './components/OfficeAiAccess';
 import { 
@@ -534,6 +534,8 @@ export default function App() {
             >
               <ShieldCheck className="h-4 w-4"/><span className="hidden md:inline">Quyền</span> Văn phòng AI
             </button>}
+
+            {officeAiUrl && <a href={officeAiUrl} target="_blank" rel="noreferrer" className={`flex min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-2.5 py-2 text-xs font-medium transition-all sm:px-3.5 sm:text-sm ${darkMode ? 'border-teal-500/30 bg-teal-500/10 text-teal-300 hover:bg-teal-500/20' : 'border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100'}`}><Activity className="h-4 w-4"/><span>Văn phòng AI</span></a>}
 
             <button 
               onClick={() => openNewTask(activeTab === 'calendar' ? calendarSelectedDate : getLocalDateString())}

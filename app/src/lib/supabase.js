@@ -5,6 +5,7 @@ const url = import.meta.env.VITE_SUPABASE_URL || 'https://paaxjmjuyjusmlnhfwnx.s
 const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_hzSctJxgaKPksTpocpxjHA_gCFqQD8W';
 
 export const isSupabaseConfigured = Boolean(url && publishableKey);
+export const officeAiUrl = (import.meta.env.VITE_OFFICE_AI_URL || '').trim().replace(/\/+$/, '');
 export const supabase = isSupabaseConfigured ? createClient(url, publishableKey) : null;
 
 export const EMPTY_WORKSPACE = {
