@@ -36,6 +36,8 @@ jobs:
         working-directory: app
 
       - name: Build site
+        env:
+          VITE_OFFICE_AI_URL: ${{ vars.OFFICE_AI_URL }}
         run: npm run build
         working-directory: app
 
