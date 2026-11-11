@@ -14,6 +14,14 @@ This app shares Supabase Auth with the task manager. It checks the `can_use_offi
 
 Use only the Supabase publishable key in the browser and API server configuration. Never use a Supabase secret/service-role key here. Keep the Claude API key in the hosting provider's private environment settings, not in GitHub or the image.
 
+## Deploy online with Render
+
+[Open the Render deployment flow](https://render.com/deploy?repo=https://github.com/minhhien20091993/quan-ly-cong-viec). The blueprint builds the Docker service from this folder and attaches a 1 GB persistent disk at `/data`.
+
+The blueprint uses Render's `0.5c-512mb` plan (currently about $7/month) plus about $0.25/month for the 1 GB disk. Claude API usage is billed separately. Render will prompt you to enter `ANTHROPIC_API_KEY`; enter it directly in Render's secret field and never paste it into GitHub.
+
+After deployment, copy the Render HTTPS URL and add it as the GitHub Actions repository variable `OFFICE_AI_URL` in Settings → Secrets and variables → Actions → Variables. The task-manager link appears after the next Pages build.
+
 ## Local run
 
 Copy `.env.example` to `.env`, set the same variables, then run:
