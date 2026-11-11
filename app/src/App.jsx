@@ -1060,8 +1060,7 @@ export default function App() {
                   <div className={`flex p-1 rounded-xl ${darkMode ? 'bg-slate-950 border border-slate-800' : 'bg-slate-100'}`}>
                     <button onClick={() => setActiveCategorySubTab('staff')} className={`px-4 py-2 rounded-lg text-xs font-medium transition ${activeCategorySubTab === 'staff' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>1. Nhân sự</button>
                     <button onClick={() => setActiveCategorySubTab('departments')} className={`px-4 py-2 rounded-lg text-xs font-medium transition ${activeCategorySubTab === 'departments' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>2. Phòng Ban</button>
-                    <button onClick={() => setActiveCategorySubTab('categories')} className={`px-4 py-2 rounded-lg text-xs font-medium transition ${activeCategorySubTab === 'categories' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>3. Danh mục</button>
-                    <button onClick={() => setActiveCategorySubTab('jobTypes')} className={`px-4 py-2 rounded-lg text-xs font-medium transition ${activeCategorySubTab === 'jobTypes' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>4. Loại công việc</button>
+                    <button onClick={() => setActiveCategorySubTab('jobTypes')} className={`px-4 py-2 rounded-lg text-xs font-medium transition ${activeCategorySubTab === 'jobTypes' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>3. Loại công việc</button>
                   </div>
                 </div>
 
@@ -1156,30 +1155,7 @@ export default function App() {
                   </div>
                 )}
 
-                {activeCategorySubTab === 'categories' && (
-                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200'} space-y-4`}>
-                    <h3 className="font-bold text-sm sm:text-base flex items-center gap-2"><Layers className="w-4 h-4 text-emerald-400"/> Quản lý Danh mục Sự cố / Yêu cầu</h3>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if (!newCatInput.trim()) return;
-                      if (!categoryTypes.includes(newCatInput.trim())) {
-                        setCategoryTypes([...categoryTypes, newCatInput.trim()]);
-                        setNewCatInput('');
-                      } else { alert('Danh mục đã tồn tại!'); }
-                    }} className="flex gap-2">
-                      <input type="text" placeholder="Nhập loại danh mục sự cố mới..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className={`flex-1 px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`} />
-                      <button type="submit" className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-medium shadow flex items-center gap-1.5"><Plus className="w-4 h-4"/> Thêm mới</button>
-                    </form>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {categoryTypes.map((cat, index) => (
-                        <div key={index} className={`p-3.5 rounded-xl border ${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'} flex justify-between items-center text-xs sm:text-sm font-medium`}>
-                          <span>📌 {cat}</span>
-                          <button onClick={() => { if (window.confirm(`Xóa danh mục "${cat}"?`)) setCategoryTypes(categoryTypes.filter(c => c !== cat)); }} className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800"><Trash2 className="w-4 h-4"/></button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                
               </div>
             )}
           </div>
