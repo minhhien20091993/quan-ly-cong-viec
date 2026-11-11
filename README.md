@@ -12,8 +12,12 @@ A task-management dashboard built with React, Vite, and Supabase. Supabase Auth 
 ## Supabase setup
 
 1. Run `supabase/schema.sql` once in the project's Supabase SQL Editor.
-2. In Supabase Authentication settings, keep **Allow new users to sign up** disabled. Create the owner account from Authentication > Users > Add user; create additional accounts only for people who should access the shared workspace.
-3. Open the GitHub Pages website and sign in with that account. Use the same account on other devices. Changes are saved to the shared Supabase workspace; reload another already-open device to fetch the latest data.
+2. Run `supabase/office_ai_access.sql` after the Supabase account `minhhien20091993@gmail.com` exists. This account becomes the highest-level Office AI administrator.
+3. In Supabase Authentication settings, keep **Allow new users to sign up** disabled. Create additional accounts only for people who should access the shared workspace. New accounts are added to the protected account list automatically.
+4. Open the GitHub Pages website and sign in. The highest-level administrator sees **Văn phòng AI** permissions and can grant or revoke AI access for each account.
+5. Supabase RLS protects the account and permission tables. Only the publishable key is used in the browser; never put a Supabase secret or service-role key in this public repository.
+
+The Office AI API must also validate the Supabase access token and call the `can_use_office_ai()` function before serving data or processing requests. Configuring the separate AI backend is required for the permission toggle to take effect there.
 
 The browser uses only the Supabase publishable key. Row Level Security limits table access to authenticated accounts. Never put a Supabase secret or service-role key in this public repository. The category password `761311` only hides the category screen and is not an authorization boundary. Do not use real patient or confidential organizational data in this public demo.
 
