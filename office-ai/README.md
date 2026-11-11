@@ -16,11 +16,11 @@ Use only the Supabase publishable key in the browser and API server configuratio
 
 ## Deploy online with Render
 
-[Open the Render deployment flow](https://render.com/deploy?repo=https://github.com/minhhien20091993/quan-ly-cong-viec). The blueprint builds the Docker service from this folder and attaches a 1 GB persistent disk at `/data`.
+[Open the Render deployment flow](https://render.com/deploy?repo=https://github.com/minhhien20091993/quan-ly-cong-viec). The blueprint builds the Docker service from this folder on Render's Free plan. Render sleeps the service after 15 minutes without traffic, and the first request after sleep may take about a minute to wake it. The free filesystem is temporary, so session history and the shared process file can disappear after a restart, sleep, or redeploy. This is for a pilot/demo, not reliable long-term history. [Render Free limitations](https://render.com/docs/free).
 
-The blueprint uses Render's `0.5c-512mb` plan (currently about $7/month) plus about $0.25/month for the 1 GB disk. Claude API usage is billed separately. Render will prompt you to enter `ANTHROPIC_API_KEY`; enter it directly in Render's secret field and never paste it into GitHub.
+Claude API usage is billed separately. Render will prompt you to enter `ANTHROPIC_API_KEY`; enter it directly in Render's secret field and never paste it into GitHub.
 
-After deployment, copy the Render HTTPS URL and add it as the GitHub Actions repository variable `OFFICE_AI_URL` in Settings → Secrets and variables → Actions → Variables. The task-manager link appears after the next Pages build.
+After deployment, copy the Render HTTPS URL and add it as the GitHub Actions repository variable `OFFICE_AI_URL` in Settings → Secrets and variables → Actions → Variables. The task-manager link appears after the next Pages build. For reliable history, upgrade to a paid service with persistent disk or move session storage into Supabase first.
 
 ## Local run
 
