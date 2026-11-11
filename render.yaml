@@ -2,6 +2,7 @@ services:
   - type: web
     name: van-phong-ai
     runtime: docker
+    plan: free
     dockerfilePath: ./office-ai/Dockerfile
     dockerContext: ./office-ai
     healthCheckPath: /
@@ -13,6 +14,8 @@ services:
         value: https://paaxjmjuyjusmlnhfwnx.supabase.co
       - key: SUPABASE_PUBLISHABLE_KEY
         value: sb_publishable_hzSctJxgaKPksTpocpxjHA_gCFqQD8W
+      - key: SUPABASE_SESSION_STORAGE
+        value: "1"
       - key: DATA_DIR
         value: /data
       - key: HOST
