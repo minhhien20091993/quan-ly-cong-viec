@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: van-phong-ai
+    runtime: docker
+    plan: 0.5c-512mb
+    dockerfilePath: ./office-ai/Dockerfile
+    dockerContext: ./office-ai
+    healthCheckPath: /
+    numInstances: 1
+    disk:
+      name: office-ai-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        value: https://paaxjmjuyjusmlnhfwnx.supabase.co
+      - key: SUPABASE_PUBLISHABLE_KEY
+        value: sb_publishable_hzSctJxgaKPksTpocpxjHA_gCFqQD8W
+      - key: DATA_DIR
+        value: /data
+      - key: HOST
+        value: 0.0.0.0
