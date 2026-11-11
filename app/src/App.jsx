@@ -141,6 +141,11 @@ export default function App() {
     return saved ? JSON.parse(saved) : ['Sự cố hạ tầng', 'Bảo trì định kỳ', 'Yêu cầu phần mềm mẫu', 'Cấp tài khoản / Phân quyền'];
   });
 
+  const [jobTypes, setJobTypes] = useState(() => {
+    const saved = localStorage.getItem('demo_job_types');
+    return saved ? JSON.parse(saved) : ['Sự cố', 'Bảo trì định kỳ', 'Yêu cầu hỗ trợ'];
+  });
+
   const [tasks, setTasks] = useState(() => {
     const saved = localStorage.getItem('demo_tasks');
     return saved ? JSON.parse(saved) : [
@@ -190,10 +195,12 @@ export default function App() {
 
   const [newDeptInput, setNewDeptInput] = useState('');
   const [newCatInput, setNewCatInput] = useState('');
+  const [newJobTypeInput, setNewJobTypeInput] = useState('');
 
   useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_staff', JSON.stringify(staffList)); }, [staffList]);
   useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_departments', JSON.stringify(departments)); }, [departments]);
   useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_category_types', JSON.stringify(categoryTypes)); }, [categoryTypes]);
+  useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_job_types', JSON.stringify(jobTypes)); }, [jobTypes]);
   useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_tasks', JSON.stringify(tasks)); }, [tasks]);
   useEffect(() => { if (!isSupabaseConfigured) localStorage.setItem('demo_assets', JSON.stringify(assets)); }, [assets]);
 
@@ -220,6 +227,7 @@ export default function App() {
       setStaffList(Array.isArray(workspace.staff) ? workspace.staff : []);
       setDepartments(Array.isArray(workspace.departments) ? workspace.departments : []);
       setCategoryTypes(Array.isArray(workspace.categoryTypes) ? workspace.categoryTypes : []);
+      setJobTypes(Array.isArray(workspace.jobTypes) ? workspace.jobTypes : ['Sự cố', 'Bảo trì định kỳ', 'Yêu cầu hỗ trợ']);
       setTasks(Array.isArray(workspace.tasks) ? workspace.tasks : []);
       setAssets(Array.isArray(workspace.assets) ? workspace.assets : []);
       setWorkspaceReady(true);
@@ -234,7 +242,7 @@ export default function App() {
     const timer = setTimeout(async () => {
       const { error } = await supabase.from('workspace_state').upsert({
         id: 'main',
-        data: { staff: staffList, departments, categoryTypes, tasks, assets },
+        data: { staff: staffList, departments, categoryTypes, jobTypes, tasks, assets },
         updated_by: session.user.id,
         updated_at: new Date().toISOString(),
       });
@@ -242,7 +250,7 @@ export default function App() {
       else setCloudError('');
     }, 500);
     return () => clearTimeout(timer);
-  }, [session?.user?.id, workspaceReady, staffList, departments, categoryTypes, tasks, assets]);
+  }, [session?.user?.id, workspaceReady, staffList, departments, categoryTypes, jobTypes, tasks, assets]);
 
   const handlePriorityChange = (priority) => {
     let defaultHours = 4;
@@ -341,7 +349,7 @@ export default function App() {
   const openNewTask = (scheduledDate = getLocalDateString(), linkedAsset = null) => {
     setEditingTask(null);
     setTaskForm({
-      title: linkedAsset ? `Kiểm tra / xử lý: ${linkedAsset.name}` : '',
+      title: jobTypes[0] || '',
       description: linkedAsset ? `Tài sản ${linkedAsset.code} - ${linkedAsset.name}${linkedAsset.location ? `\nVị trí: ${linkedAsset.location}` : ''}` : '',
       assignee: staffList[0]?.name || '', priority: 'P3 - Trung bình', status: 'Todo',
       department: linkedAsset?.department || departments[0] || '', estimatedHours: 4,
@@ -1053,6 +1061,7 @@ export default function App() {
                     <button onClick={() => setActiveCategorySubTab('staff')} className={`px-4 py-2 rounded-lg text-xs font-medium transition ${activeCategorySubTab === 'staff' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>1. Nhân sự</button>
                     <button onClick={() => setActiveCategorySubTab('departments')} className={`px-4 py-2 rounded-lg text-xs font-medium transition ${activeCategorySubTab === 'departments' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>2. Phòng Ban</button>
                     <button onClick={() => setActiveCategorySubTab('categories')} className={`px-4 py-2 rounded-lg text-xs font-medium transition ${activeCategorySubTab === 'categories' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>3. Danh mục</button>
+                    <button onClick={() => setActiveCategorySubTab('jobTypes')} className={`px-4 py-2 rounded-lg text-xs font-medium transition ${activeCategorySubTab === 'jobTypes' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}>4. Loại công việc</button>
                   </div>
                 </div>
 
@@ -1116,6 +1125,33 @@ export default function App() {
                           <button onClick={() => { if (departments.length <= 1) { alert('Cần giữ lại ít nhất một phòng ban!'); return; } if (window.confirm(`Xóa phòng ban "${dept}"?`)) setDepartments(departments.filter(d => d !== dept)); }} className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800"><Trash2 className="w-4 h-4"/></button>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeCategorySubTab === 'jobTypes' && (
+                  <div className={`p-6 rounded-2xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200'} space-y-4`}>
+                    <h3 className="font-bold text-sm sm:text-base flex items-center gap-2"><Layers className="w-4 h-4 text-blue-400"/> Quản lý Loại công việc</h3>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      const value = newJobTypeInput.trim();
+                      if (!value) return;
+                      if (!jobTypes.some(type => type.toLocaleLowerCase() === value.toLocaleLowerCase())) {
+                        setJobTypes([...jobTypes, value]);
+                        setNewJobTypeInput('');
+                      } else { alert('Loại công việc đã tồn tại!'); }
+                    }} className="flex gap-2">
+                      <input type="text" placeholder="Nhập loại công việc mới..." value={newJobTypeInput} onChange={(e) => setNewJobTypeInput(e.target.value)} className={`flex-1 px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`} />
+                      <button type="submit" className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs sm:text-sm font-medium shadow flex items-center gap-1.5"><Plus className="w-4 h-4"/> Thêm mới</button>
+                    </form>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {jobTypes.map((type, index) => (
+                        <div key={index} className={`p-3.5 rounded-xl border ${darkMode ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'} flex justify-between items-center text-xs sm:text-sm font-medium`}>
+                          <span>📌 {type}</span>
+                          <button onClick={() => { if (window.confirm(`Xóa loại công việc "${type}"?`)) setJobTypes(jobTypes.filter(item => item !== type)); }} className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-slate-800"><Trash2 className="w-4 h-4"/></button>
+                        </div>
+                      ))}
+                      {jobTypes.length === 0 && <p className="col-span-full text-xs text-slate-500 italic">Chưa có loại công việc. Hãy thêm danh mục để chọn khi tạo công việc.</p>}
                     </div>
                   </div>
                 )}
@@ -1217,15 +1253,18 @@ export default function App() {
             <form onSubmit={handleSaveTask} className="flex-1 min-h-0 overflow-y-auto px-5 py-5 sm:px-7 space-y-5 overscroll-contain">
               {taskForm.assetId && assets.find(asset => asset.id === taskForm.assetId) && <div className={`rounded-xl border px-3.5 py-3 text-xs ${darkMode ? 'border-cyan-900/70 bg-cyan-950/30 text-cyan-200' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}`}><span className="font-semibold">Tài sản liên quan:</span> {assets.find(asset => asset.id === taskForm.assetId)?.code} · {assets.find(asset => asset.id === taskForm.assetId)?.name}</div>}
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Tiêu đề công việc / Sự cố *</label>
-                <input 
-                  type="text" 
+                <label className="block text-xs font-medium text-slate-400 mb-1">Loại công việc *</label>
+                <select
                   required
-                  placeholder="Ví dụ: Thiết lập máy in văn phòng"
                   value={taskForm.title}
                   onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-                  className={`w-full min-h-12 px-4 py-3 text-base sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white focus:border-blue-500' : 'bg-slate-50 border-slate-200'}`}
-                />
+                  className={`w-full min-h-12 px-4 py-3 text-base sm:text-sm rounded-xl border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200'}`}
+                >
+                  <option value="" disabled>Chọn loại công việc</option>
+                  {taskForm.title && !jobTypes.includes(taskForm.title) && <option value={taskForm.title}>{taskForm.title} (cũ)</option>}
+                  {jobTypes.map((type, index) => <option key={index} value={type}>{type}</option>)}
+                </select>
+                {jobTypes.length === 0 && <p className="mt-1 text-[11px] text-amber-400">Chưa có danh mục loại công việc. Hãy thêm danh mục trong Quản lý danh mục.</p>}
               </div>
 
               <div>
