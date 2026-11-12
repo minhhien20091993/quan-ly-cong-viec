@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { isSupabaseConfigured, supabase, EMPTY_WORKSPACE, officeAiUrl } from './lib/supabase';
 import AssetManagement from './components/AssetManagement';
 import OfficeAiAccess from './components/OfficeAiAccess';
@@ -20,6 +20,8 @@ import {
   FolderTree,
   ShieldCheck,
   Activity,
+  Sparkles,
+  Download,
   Layers,
   SlidersHorizontal,
   CheckCircle,
@@ -203,8 +205,59 @@ export default function App() {
   });
 
   const [newCommentText, setNewCommentText] = useState('');
-  const [taskHandoffBusy, setTaskHandoffBusy] = useState(false);
-  const [taskHandoffError, setTaskHandoffError] = useState('');
+  const [aiSubmitting, setAiSubmitting] = useState({});
+  const tasksRef = useRef(tasks);
+  const aiPollInFlight = useRef(new Set());
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+
+  const updateTaskAi = (taskId, aiSuggestion) => {
+    setTasks(current => current.map(task => task.id === taskId
+      ? { ...task, aiSuggestion: { ...(task.aiSuggestion || {}), ...aiSuggestion } }
+      : task));
+  };
+
+  const aiFetchOptions = (accessToken, extra = {}) => ({
+    ...extra,
+    headers: { ...(extra.headers || {}), Authorization: `Bearer ${accessToken}` },
+    // Chrome asks the user to allow LAN access when a secure GitHub Pages site calls the LAN server.
+    targetAddressSpace: 'local',
+  });
+
+  const checkTaskAiStatus = async (task, accessToken, cancelled = () => false) => {
+    const sid = task.aiSuggestion?.sessionId;
+    if (!sid || task.aiSuggestion?.status !== 'running' || aiPollInFlight.current.has(sid)) return;
+    aiPollInFlight.current.add(sid);
+    try {
+      const response = await fetch(`${officeAiUrl}/task-jobs/${encodeURIComponent(sid)}`,
+        aiFetchOptions(accessToken));
+      const data = await response.json().catch(() => ({}));
+      if (cancelled()) return;
+      if (response.status === 401 || response.status === 403) {
+        updateTaskAi(task.id, { status: 'error', error: data.error || 'Tài khoản không còn quyền dùng Văn phòng AI.' });
+      } else if (response.status === 404) {
+        updateTaskAi(task.id, { status: 'error', error: data.error || 'Không còn tìm thấy phiên AI cho công việc này. Hãy gửi lại yêu cầu.' });
+      } else if (response.ok && data.status === 'done' && data.ready) {
+        updateTaskAi(task.id, { status: 'done', error: '', completedAt: new Date().toISOString() });
+      } else if (response.ok && data.status === 'error') {
+        updateTaskAi(task.id, { status: 'error', error: data.error || 'Văn phòng AI chưa xử lý được công việc.' });
+      }
+    } catch {
+      // Keep the task in the running state while the LAN server is temporarily unreachable.
+    } finally {
+      aiPollInFlight.current.delete(sid);
+    }
+  };
+
+  useEffect(() => {
+    if (!officeAiUrl || !workspaceReady || !session?.access_token) return undefined;
+    let cancelled = false;
+    const poll = () => tasksRef.current.forEach(task => {
+      void checkTaskAiStatus(task, session.access_token, () => cancelled);
+    });
+    poll();
+    const timer = setInterval(poll, 3500);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [officeAiUrl, workspaceReady, session?.access_token]);
 
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
@@ -443,44 +496,90 @@ export default function App() {
     setEditingTask(null);
   };
 
-  const handleSendTaskToOfficeAi = async () => {
-    if (!editingTask || !officeAiUrl || !session?.user?.id || !supabase) return;
-    const task = {
-      title: taskForm.title.trim(),
-      description: taskForm.description.trim(),
-      department: taskForm.department || '',
-      priority: taskForm.priority || '',
-      status: taskForm.status || '',
-      reportedAt: taskForm.dateTime || '',
-      scheduledDate: taskForm.scheduledDate || '',
-    };
-    const approved = window.confirm(
-      'Gửi tiêu đề, mô tả và thông tin tiến độ của công việc này qua Supabase để mở trong Văn phòng AI?\n\n' +
-      'Không gửi nhật ký trao đổi, tên người phụ trách hay tệp đính kèm. Hãy chắc chắn phần mô tả không có tên/mã bệnh nhân, mật khẩu hoặc thông tin nhạy cảm.'
-    );
-    if (!approved) return;
-    const aiWindow = window.open('about:blank', '_blank');
-    if (!aiWindow) {
-      setTaskHandoffError('Trình duyệt đang chặn cửa sổ mới. Hãy cho phép mở tab mới rồi thử lại.');
-      return;
-    }
-    aiWindow.opener = null;
-    setTaskHandoffBusy(true);
-    setTaskHandoffError('');
+  const handleTaskAiSupport = async (task) => {
+    if (!task || aiSubmitting[task.id] || !officeAiUrl || !session?.user?.id || !supabase) return;
+    setAiSubmitting(current => ({ ...current, [task.id]: true }));
+    updateTaskAi(task.id, { error: '' });
     try {
-      const handoffId = crypto.randomUUID();
-      const { error } = await supabase.from('office_ai_task_handoffs')
-        .insert({ id: handoffId, payload: task });
-      if (error) throw error;
-      const target = new URL(officeAiUrl);
-      target.searchParams.set('handoff', handoffId);
-      aiWindow.location.replace(target.toString());
+      const { data: allowed, error: permissionError } = await supabase.rpc('can_use_office_ai');
+      if (permissionError) throw new Error('Chưa kiểm tra được quyền Văn phòng AI. Hãy kiểm tra migration quyền trong Supabase.');
+      if (allowed !== true) {
+        updateTaskAi(task.id, { status: 'error', error: 'Tài khoản chưa được cấp quyền Văn phòng AI.' });
+        return;
+      }
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !currentSession?.access_token) throw new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.');
+      const response = await fetch(`${officeAiUrl}/task-jobs`, aiFetchOptions(currentSession.access_token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task_id: String(task.id),
+          title: task.title || '',
+          description: task.description || '',
+          department: task.department || '',
+          priority: task.priority || '',
+          status: task.status || '',
+          reported_at: task.dateTime || '',
+          scheduled_date: task.scheduledDate || '',
+        }),
+      }));
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Văn phòng AI không nhận được công việc.');
+      updateTaskAi(task.id, { status: 'running', sessionId: result.id, ownerId: currentSession.user.id, error: '', requestedAt: new Date().toISOString() });
     } catch (error) {
-      aiWindow.close();
-      setTaskHandoffError(error.message || 'Không tạo được phiếu chuyển việc. Hãy kiểm tra migration Supabase.');
+      updateTaskAi(task.id, { status: 'error', error: error.message || 'Không gửi được yêu cầu tới Văn phòng AI.' });
     } finally {
-      setTaskHandoffBusy(false);
+      setAiSubmitting(current => ({ ...current, [task.id]: false }));
     }
+  };
+
+  const handleDownloadTaskAi = async (task) => {
+    const sid = task.aiSuggestion?.sessionId;
+    if (!sid || task.aiSuggestion?.status !== 'done' || !supabase) return;
+    try {
+      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+      if (error || !currentSession?.access_token) throw new Error('Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.');
+      const response = await fetch(`${officeAiUrl}/task-jobs/${encodeURIComponent(sid)}/docx`,
+        aiFetchOptions(currentSession.access_token));
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || 'Chưa tải được tệp AI gợi ý.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const safeTitle = (task.title || 'cong_viec').replace(/[^\p{L}\p{N}_-]+/gu, '_').slice(0, 60);
+      link.href = url;
+      link.download = `AI_goi_y_${safeTitle}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      updateTaskAi(task.id, { error: '' });
+    } catch (error) {
+      updateTaskAi(task.id, { error: error.message || 'Không tải được tệp AI gợi ý.' });
+    }
+  };
+
+  const renderTaskAiActions = (task, compact = false) => {
+    if (!officeAiUrl || !isSupabaseConfigured) return null;
+    const ai = task.aiSuggestion || {};
+    const running = ai.status === 'running' || aiSubmitting[task.id];
+    const ready = ai.status === 'done' && ai.ownerId === session?.user?.id;
+    const buttonClass = compact ? 'px-2 py-1 text-[10px]' : 'px-2.5 py-1.5 text-[10px]';
+    return <div className="mt-2 flex flex-wrap items-center gap-1.5" onClick={event => event.stopPropagation()}>
+      <button type="button" onClick={() => handleTaskAiSupport(task)} disabled={running}
+        className={`${buttonClass} inline-flex items-center gap-1 rounded-lg border font-semibold transition disabled:cursor-wait disabled:opacity-60 ${darkMode ? 'border-violet-700/60 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20' : 'border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100'}`}>
+        <Sparkles className="h-3 w-3"/>{running ? 'AI đang xử lý…' : ready ? 'AI hỗ trợ lại' : 'AI hỗ trợ'}
+      </button>
+      <button type="button" onClick={() => handleDownloadTaskAi(task)} disabled={!ready}
+        className={`${buttonClass} inline-flex items-center gap-1 rounded-lg border font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${ready ? 'border-teal-600/60 bg-teal-500/15 text-teal-300 hover:bg-teal-500/25' : 'border-slate-700 bg-slate-800/50 text-slate-500'}`}>
+        <Download className="h-3 w-3"/>AI gợi ý
+      </button>
+      {running && <span className="text-[10px] text-amber-400">Đang phân tích task</span>}
+      {ai.status === 'done' && !ready && <span className="text-[10px] text-slate-500">Nhấn AI hỗ trợ để tạo kết quả cho tài khoản này</span>}
+      {ai.error && <span role="status" className="w-full text-[10px] text-rose-400">{ai.error}</span>}
+    </div>;
   };
 
   const handleDeleteTask = (id) => {
@@ -821,14 +920,17 @@ export default function App() {
               </div>
               <div className="space-y-2">
                 {selectedDayTasks.map(task => (
-                  <button key={task.id} onClick={() => { setEditingTask(task); setTaskForm({ ...task, scheduledDate: task.scheduledDate || task.dateTime?.split('T')[0] || calendarSelectedDate }); setIsTaskModalOpen(true); }} className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${darkMode ? 'border-slate-800 bg-slate-950/60 hover:border-blue-500/50' : 'border-slate-200 bg-slate-50 hover:border-blue-400'}`}>
-                    <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${task.status === 'Done' ? 'bg-emerald-400' : task.status === 'In Progress' ? 'bg-amber-400' : 'bg-blue-400'}`}/>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold">{task.title}</span>
-                      <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400"><span>{task.dateTime?.split('T')[1] ? `Tiếp nhận ${task.dateTime.split('T')[1]}` : 'Chưa có giờ tiếp nhận'}</span><span>{task.assignee || 'Chưa giao'}</span><span>{task.department || 'Chưa có bộ phận'}</span></span>
-                    </span>
-                    <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-medium ${task.status === 'Done' ? 'bg-emerald-500/10 text-emerald-300' : task.status === 'In Progress' ? 'bg-amber-500/10 text-amber-300' : 'bg-blue-500/10 text-blue-300'}`}>{task.status === 'Done' ? 'Hoàn thành' : task.status === 'In Progress' ? 'Đang làm' : 'Cần làm'}</span>
-                  </button>
+                  <div key={task.id} className={`rounded-xl border p-3 ${darkMode ? 'border-slate-800 bg-slate-950/60' : 'border-slate-200 bg-slate-50'}`}>
+                    <button onClick={() => { setEditingTask(task); setTaskForm({ ...task, scheduledDate: task.scheduledDate || task.dateTime?.split('T')[0] || calendarSelectedDate }); setIsTaskModalOpen(true); }} className="flex w-full items-start gap-3 text-left">
+                      <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${task.status === 'Done' ? 'bg-emerald-400' : task.status === 'In Progress' ? 'bg-amber-400' : 'bg-blue-400'}`}/>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold">{task.title}</span>
+                        <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-400"><span>{task.dateTime?.split('T')[1] ? `Tiếp nhận ${task.dateTime.split('T')[1]}` : 'Chưa có giờ tiếp nhận'}</span><span>{task.assignee || 'Chưa giao'}</span><span>{task.department || 'Chưa có bộ phận'}</span></span>
+                      </span>
+                      <span className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-medium ${task.status === 'Done' ? 'bg-emerald-500/10 text-emerald-300' : task.status === 'In Progress' ? 'bg-amber-500/10 text-amber-300' : 'bg-blue-500/10 text-blue-300'}`}>{task.status === 'Done' ? 'Hoàn thành' : task.status === 'In Progress' ? 'Đang làm' : 'Cần làm'}</span>
+                    </button>
+                    {renderTaskAiActions(task, true)}
+                  </div>
                 ))}
                 {selectedDayTasks.length === 0 && <div className={`rounded-xl border border-dashed p-7 text-center ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}><Calendar className="mx-auto h-7 w-7 text-slate-500"/><p className="mt-2 text-sm font-medium">Chưa có công việc trong ngày</p><p className="mt-1 text-xs text-slate-400">Thêm việc để lên lịch cho ngày này.</p></div>}
               </div>
@@ -979,6 +1081,7 @@ export default function App() {
                               )}
                             </div>
                           </div>
+                          {renderTaskAiActions(task)}
 
                         </div>
                       );
@@ -1029,6 +1132,7 @@ export default function App() {
                             )}
                           </div>
                           {task.description && <p className="text-xs text-slate-400 font-normal truncate mt-0.5">{task.description}</p>}
+                          {renderTaskAiActions(task, true)}
                         </td>
                         <td className="py-4 px-5 align-middle">
                           <span className="inline-block px-2.5 py-1 text-xs bg-purple-500/10 text-purple-300 border border-purple-500/20 rounded-lg font-medium">
@@ -1458,9 +1562,7 @@ export default function App() {
                 </div>
               )}
 
-              {taskHandoffError && <p role="alert" className="text-xs text-rose-400">{taskHandoffError}</p>}
               <div className={`sticky bottom-0 -mx-5 sm:-mx-7 px-5 sm:px-7 py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-                {editingTask && officeAiUrl && isSupabaseConfigured && <button type="button" onClick={handleSendTaskToOfficeAi} disabled={taskHandoffBusy} className={`px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition disabled:opacity-60 ${darkMode ? 'border-teal-800 text-teal-300 hover:bg-teal-950' : 'border-teal-200 text-teal-700 hover:bg-teal-50'}`}>{taskHandoffBusy ? 'Đang chuyển…' : 'Nhờ Văn phòng AI tư vấn'}</button>}
                 <button type="button" onClick={() => setIsTaskModalOpen(false)} className={`px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition ${darkMode ? 'border-slate-800 hover:bg-slate-800 text-slate-300' : 'border-slate-300 hover:bg-slate-100'}`}>Hủy</button>
                 <button type="submit" className="px-5 py-2.5 text-xs sm:text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-600/30 transition">Lưu công việc</button>
               </div>
