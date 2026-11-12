@@ -942,6 +942,34 @@ async def put_process(request: Request):
     return {"ok": True}
 
 
+@app.get("/handoffs/{handoff_id}")
+async def consume_task_handoff(handoff_id: str):
+    """Đọc và tiêu thụ một phiếu công việc bằng đúng phiên Supabase của người dùng."""
+    if not re.fullmatch(r"(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", handoff_id):
+        return JSONResponse({"error": "Mã bàn giao không hợp lệ."}, status_code=400)
+    token = _current_access_token.get()
+    if not token:
+        return JSONResponse({"error": "Cần đăng nhập để nhận công việc."}, status_code=401)
+    status, raw = await asyncio.to_thread(
+        _supabase_request,
+        "/rest/v1/rpc/consume_office_ai_task_handoff",
+        "POST",
+        token,
+        {"p_id": handoff_id},
+    )
+    if status != 200:
+        return JSONResponse({
+            "error": "Không nhận được công việc. Hãy kiểm tra migration office_ai_task_handoffs.sql trong Supabase."
+        }, status_code=503 if status >= 500 else status)
+    try:
+        payload = json.loads(raw or b"null")
+    except (json.JSONDecodeError, TypeError):
+        payload = None
+    if not isinstance(payload, dict):
+        return JSONResponse({"error": "Phiếu đã được nhận, đã hết hạn hoặc không thuộc tài khoản này."}, status_code=404)
+    return payload
+
+
 @app.get("/sessions")
 async def sessions():
     out = []
