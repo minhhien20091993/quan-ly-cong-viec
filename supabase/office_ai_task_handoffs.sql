@@ -4,8 +4,7 @@ create table if not exists public.office_ai_task_handoffs (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
   payload jsonb not null,
-  created_at timestamptz not null default now(),
-  consumed_at timestamptz
+  created_at timestamptz not null default now()
 );
 
 alter table public.office_ai_task_handoffs enable row level security;
@@ -26,13 +25,13 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 begin
   delete from public.office_ai_task_handoffs
    where created_at <= now() - interval '2 hours';
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists purge_expired_office_ai_task_handoffs on public.office_ai_task_handoffs;
 create trigger purge_expired_office_ai_task_handoffs
