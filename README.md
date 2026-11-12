@@ -19,6 +19,8 @@ A task-management dashboard built with React, Vite, and Supabase. Supabase Auth 
 
 The Office AI API must also validate the Supabase access token and call the `can_use_office_ai()` function before serving data or processing requests. Configuring the separate AI backend is required for the permission toggle to take effect there.
 
+Each task has an **AI hỗ trợ** action. It checks the signed-in user's Office AI permission, sends the task to the Office AI backend in the background, and enables **AI gợi ý** when the Word report is ready. The task page passes its existing Supabase session to the backend, so users do not need to sign in to the separate Office AI page. The backend's `OFFICE_AI_CORS_ORIGINS` must include this GitHub Pages origin. When the backend is addressed by a LAN IP from HTTPS GitHub Pages, Chrome may ask once to allow local-network access. The backend machine must be on and reachable from the user's network or VPN.
+
 The browser uses only the Supabase publishable key. Row Level Security limits table access to authenticated accounts. Never put a Supabase secret or service-role key in this public repository. The category password `761311` only hides the category screen and is not an authorization boundary. Do not use real patient or confidential organizational data in this public demo.
 
 The application does not call paid AI APIs.
