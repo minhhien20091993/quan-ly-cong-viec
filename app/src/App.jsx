@@ -203,6 +203,8 @@ export default function App() {
   });
 
   const [newCommentText, setNewCommentText] = useState('');
+  const [taskHandoffBusy, setTaskHandoffBusy] = useState(false);
+  const [taskHandoffError, setTaskHandoffError] = useState('');
 
   const [isStaffModalOpen, setIsStaffModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
@@ -439,6 +441,46 @@ export default function App() {
     }
     setIsTaskModalOpen(false);
     setEditingTask(null);
+  };
+
+  const handleSendTaskToOfficeAi = async () => {
+    if (!editingTask || !officeAiUrl || !session?.user?.id || !supabase) return;
+    const task = {
+      title: taskForm.title.trim(),
+      description: taskForm.description.trim(),
+      department: taskForm.department || '',
+      priority: taskForm.priority || '',
+      status: taskForm.status || '',
+      reportedAt: taskForm.dateTime || '',
+      scheduledDate: taskForm.scheduledDate || '',
+    };
+    const approved = window.confirm(
+      'Gửi tiêu đề, mô tả và thông tin tiến độ của công việc này qua Supabase để mở trong Văn phòng AI?\n\n' +
+      'Không gửi nhật ký trao đổi, tên người phụ trách hay tệp đính kèm. Hãy chắc chắn phần mô tả không có tên/mã bệnh nhân, mật khẩu hoặc thông tin nhạy cảm.'
+    );
+    if (!approved) return;
+    const aiWindow = window.open('about:blank', '_blank');
+    if (!aiWindow) {
+      setTaskHandoffError('Trình duyệt đang chặn cửa sổ mới. Hãy cho phép mở tab mới rồi thử lại.');
+      return;
+    }
+    aiWindow.opener = null;
+    setTaskHandoffBusy(true);
+    setTaskHandoffError('');
+    try {
+      const handoffId = crypto.randomUUID();
+      const { error } = await supabase.from('office_ai_task_handoffs')
+        .insert({ id: handoffId, payload: task });
+      if (error) throw error;
+      const target = new URL(officeAiUrl);
+      target.searchParams.set('handoff', handoffId);
+      aiWindow.location.replace(target.toString());
+    } catch (error) {
+      aiWindow.close();
+      setTaskHandoffError(error.message || 'Không tạo được phiếu chuyển việc. Hãy kiểm tra migration Supabase.');
+    } finally {
+      setTaskHandoffBusy(false);
+    }
   };
 
   const handleDeleteTask = (id) => {
@@ -1416,7 +1458,9 @@ export default function App() {
                 </div>
               )}
 
+              {taskHandoffError && <p role="alert" className="text-xs text-rose-400">{taskHandoffError}</p>}
               <div className={`sticky bottom-0 -mx-5 sm:-mx-7 px-5 sm:px-7 py-4 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                {editingTask && officeAiUrl && isSupabaseConfigured && <button type="button" onClick={handleSendTaskToOfficeAi} disabled={taskHandoffBusy} className={`px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition disabled:opacity-60 ${darkMode ? 'border-teal-800 text-teal-300 hover:bg-teal-950' : 'border-teal-200 text-teal-700 hover:bg-teal-50'}`}>{taskHandoffBusy ? 'Đang chuyển…' : 'Nhờ Văn phòng AI tư vấn'}</button>}
                 <button type="button" onClick={() => setIsTaskModalOpen(false)} className={`px-4 py-2.5 text-xs sm:text-sm font-medium rounded-xl border transition ${darkMode ? 'border-slate-800 hover:bg-slate-800 text-slate-300' : 'border-slate-300 hover:bg-slate-100'}`}>Hủy</button>
                 <button type="submit" className="px-5 py-2.5 text-xs sm:text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-600/30 transition">Lưu công việc</button>
               </div>

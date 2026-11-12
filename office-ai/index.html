@@ -811,6 +811,39 @@ $('fi').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
 bindDrop($('drop')); bindDrop($('cdrop'), 'chat');
 EXAMPLES.forEach(([t, v]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = () => { $('goal').value = v; $('goal').focus(); }; $('ex').appendChild(b); });
 
+async function loadTaskHandoff() {
+  const handoffId = new URLSearchParams(window.location.search).get('handoff');
+  if (!handoffId) return;
+  try {
+    const response = await fetch('/handoffs/' + encodeURIComponent(handoffId));
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Không nhận được nội dung công việc.');
+    const lines = [
+      'YÊU CẦU TƯ VẤN TỪ TRANG QUẢN LÝ CÔNG VIỆC',
+      '',
+      'Tiêu đề: ' + (data.title || ''),
+      'Bộ phận: ' + (data.department || 'Chưa nêu'),
+      'Mức ưu tiên: ' + (data.priority || 'Chưa nêu'),
+      'Trạng thái: ' + (data.status || 'Chưa nêu'),
+      'Thời điểm ghi nhận: ' + (data.reportedAt || 'Chưa nêu'),
+      'Ngày dự kiến: ' + (data.scheduledDate || 'Chưa nêu'),
+      '',
+      'Mô tả:',
+      data.description || 'Chưa có mô tả.',
+      '',
+      'Hãy phân tích tình huống, đề xuất các bước xử lý an toàn và thực tế, nêu rõ thông tin còn thiếu và điều cần xác minh. Không tự thay đổi dữ liệu công việc.'
+    ];
+    $('goal').value = lines.join('\n');
+    $('goal').focus();
+    hideErr();
+    setPill('Đã nhận công việc · rà soát nội dung rồi bấm Gửi yêu cầu', 'ok');
+    history.replaceState(null, document.title, window.location.pathname + window.location.hash);
+  } catch (error) {
+    showErr(error.message || 'Không nhận được nội dung công việc.');
+    setPill('Chưa nhận được công việc', 'err');
+  }
+}
+
 async function init() {
   const auth = await window.aiAuthReady;
   if (!auth?.ok || !auth.session) return;
@@ -830,6 +863,7 @@ async function init() {
   if (d.demo) setPill('Chế độ demo (chưa có API key trong .env)', '');
   layout(); refresh(); requestAnimationFrame(frame);
   updateChatUI(); renderChat([]);
+  await loadTaskHandoff();
   load3D();
 }
 function focusAgent(id) {  // bấm vào agent trong cảnh 3D -> mở đúng thẻ kết quả của agent đó
