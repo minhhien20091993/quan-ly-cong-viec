@@ -23,4 +23,4 @@ Each task has an **AI hỗ trợ** action. It checks the signed-in user's Office
 
 The browser uses only the Supabase publishable key. Row Level Security limits table access to authenticated accounts. Never put a Supabase secret or service-role key in this public repository. The category password `761311` only hides the category screen and is not an authorization boundary. Do not use real patient or confidential organizational data in this public demo.
 
-The application does not call paid AI APIs.
+The task manager itself does not call paid AI APIs. When **AI hỗ trợ** is requested, the separately configured Office AI backend processes the task; Claude API charges may apply there.
