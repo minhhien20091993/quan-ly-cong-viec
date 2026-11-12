@@ -23,6 +23,7 @@ load_dotenv(BASE / ".env")
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 MODEL_LEAD = os.getenv("MODEL_LEAD", "claude-sonnet-5-5")    # điều phối, đọc tệp và biên soạn báo cáo
 MODEL_AGENT = os.getenv("MODEL_AGENT", "claude-sonnet-5-5")  # các agent chuyên trách
@@ -233,10 +234,35 @@ except ImportError:
     client = None
 
 app = FastAPI()
+OFFICE_AI_CORS_ORIGINS = [
+    origin.strip() for origin in os.getenv(
+        "OFFICE_AI_CORS_ORIGINS", "https://minhhien20091993.github.io"
+    ).split(",") if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=OFFICE_AI_CORS_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["Content-Disposition"],
+)
 _jobs: set = set()
+_task_jobs: dict = {}
 _queues: dict = {}
 _locks: dict = {}   # mỗi phiên một khóa để các lượt trao đổi không ghi chồng lên nhau
 _current_access_token = ContextVar("office_ai_access_token", default=None)
+_current_user_id = ContextVar("office_ai_user_id", default=None)
+
+
+def _verified_token_subject(token: str):
+    """Read sub only after Supabase has accepted this bearer token in the access RPC."""
+    try:
+        payload = token.split(".")[1]
+        claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+        return str(claims.get("sub") or "") or None
+    except (IndexError, ValueError, TypeError, json.JSONDecodeError):
+        return None
 
 
 def _supabase_request(path: str, method: str, token: str, payload=None, extra_headers=None):
@@ -264,30 +290,55 @@ def _supabase_request(path: str, method: str, token: str, payload=None, extra_he
 
 @app.middleware("http")
 async def require_supabase_ai_access(request: Request, call_next):
+    # Browser preflight has no bearer token; the CORS middleware answers it.
+    if request.method == "OPTIONS":
+        response = await call_next(request)
+        if request.headers.get("access-control-request-private-network", "").lower() == "true":
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
     # Chỉ HTML, module 3D và cấu hình publishable được phục vụ trước đăng nhập.
     if request.url.path in {"/", "/auth-config", "/scene3d.js"} or request.url.path.startswith("/vendor/"):
         return await call_next(request)
     if not SUPABASE_URL or not SUPABASE_PUBLISHABLE_KEY:
-        return JSONResponse({"error": "Chưa cấu hình Supabase Auth cho Văn phòng AI."}, status_code=503)
+        return _cors_error(request, JSONResponse({"error": "Chưa cấu hình Supabase Auth cho Văn phòng AI."}, status_code=503))
     authorization = request.headers.get("authorization", "")
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token.strip():
-        return JSONResponse({"error": "Cần đăng nhập bằng tài khoản Supabase."}, status_code=401)
+        return _cors_error(request, JSONResponse({"error": "Cần đăng nhập bằng tài khoản Supabase."}, status_code=401))
 
     status, raw_access = await asyncio.to_thread(
         _supabase_request, "/rest/v1/rpc/can_use_office_ai", "POST", token.strip(), {}
     )
     if status in (401, 403):
-        return JSONResponse({"error": "Phiên đăng nhập không hợp lệ hoặc đã hết hạn."}, status_code=401)
+        return _cors_error(request, JSONResponse({"error": "Phiên đăng nhập không hợp lệ hoặc đã hết hạn."}, status_code=401))
     if status != 200:
-        return JSONResponse({"error": "Chưa kiểm tra được quyền Văn phòng AI. Hãy chạy migration quyền trong Supabase."}, status_code=503)
+        return _cors_error(request, JSONResponse({"error": "Chưa kiểm tra được quyền Văn phòng AI. Hãy chạy migration quyền trong Supabase."}, status_code=503))
     if raw_access.strip().lower() != b"true":
-        return JSONResponse({"error": "Tài khoản chưa được cấp quyền truy cập Văn phòng AI."}, status_code=403)
+        return _cors_error(request, JSONResponse({"error": "Tài khoản chưa được cấp quyền truy cập Văn phòng AI."}, status_code=403))
+    user_id = _verified_token_subject(token.strip())
+    if not user_id:
+        return _cors_error(request, JSONResponse({"error": "Không xác định được tài khoản trong phiên đăng nhập."}, status_code=401))
     context_token = _current_access_token.set(token.strip())
+    context_user = _current_user_id.set(user_id)
     try:
-        return await call_next(request)
+        response = await call_next(request)
+        if request.headers.get("access-control-request-private-network", "").lower() == "true":
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
     finally:
         _current_access_token.reset(context_token)
+        _current_user_id.reset(context_user)
+
+
+def _cors_error(request: Request, response: Response):
+    """Preserve a readable API error on browsers when authorization rejects a CORS request."""
+    origin = request.headers.get("origin", "")
+    if origin in OFFICE_AI_CORS_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
+    if request.headers.get("access-control-request-private-network", "").lower() == "true":
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 
 # ---------- tệp đính kèm ----------
@@ -1158,6 +1209,104 @@ async def create_job(request: Request):
     _jobs.add(t)
     t.add_done_callback(_jobs.discard)
     return {"id": sess["id"]}
+
+
+@app.post("/task-jobs")
+async def create_task_job(request: Request):
+    """Start a task consultation in the background without opening the Office AI UI."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Dữ liệu gửi lên không hợp lệ."}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "Dữ liệu gửi lên phải là một đối tượng JSON."}, status_code=400)
+    task_id = str(body.get("task_id", "")).strip()
+    title = str(body.get("title", "")).strip()
+    description = str(body.get("description", "")).strip()
+    if not task_id or not title:
+        return JSONResponse({"error": "Thiếu mã hoặc tiêu đề công việc."}, status_code=400)
+    if len(task_id) > 128 or len(title) > 300 or len(description) > 12000:
+        return JSONResponse({"error": "Thông tin công việc vượt quá giới hạn cho phép."}, status_code=413)
+
+    goal = "\n".join([
+        "YÊU CẦU TƯ VẤN TỪ TASK QUẢN LÝ CÔNG VIỆC",
+        f"Mã công việc: {task_id}",
+        f"Tiêu đề: {title}",
+        f"Bộ phận: {str(body.get('department') or 'Chưa nêu')[:200]}",
+        f"Mức ưu tiên: {str(body.get('priority') or 'Chưa nêu')[:100]}",
+        f"Trạng thái: {str(body.get('status') or 'Chưa nêu')[:100]}",
+        f"Thời điểm ghi nhận: {str(body.get('reported_at') or 'Chưa nêu')[:100]}",
+        f"Ngày dự kiến: {str(body.get('scheduled_date') or 'Chưa nêu')[:100]}",
+        "",
+        "Mô tả chi tiết:",
+        description or "Chưa có mô tả.",
+        "",
+        "Hãy phân tích yêu cầu, đưa ra tư vấn và kế hoạch hành động cụ thể, thực tế; nêu rõ thông tin cần xác minh. Không tự thay đổi dữ liệu công việc. Không đưa thông tin định danh bệnh nhân vào báo cáo.",
+    ])
+    sess = new_session(goal)
+    sess["source"] = {"kind": "task", "task_id": task_id, "owner_id": _current_user_id.get()}
+    sess["files"] = []
+    save(sess)
+
+    async def emit(**_event):
+        return None
+
+    async def job():
+        try:
+            await orchestrate(goal, [], emit, sess)
+        except Exception as ex:
+            sess["status"], sess["error"] = "error", str(ex)
+        finally:
+            save(sess)
+
+    task = asyncio.create_task(job())
+    _jobs.add(task)
+    _task_jobs[sess["id"]] = task
+    task.add_done_callback(_jobs.discard)
+    task.add_done_callback(lambda _task, session_id=sess["id"]: _task_jobs.pop(session_id, None))
+    return {"id": sess["id"], "status": sess["status"]}
+
+
+@app.get("/task-jobs/{sid}")
+async def task_job_status(sid: str):
+    """Return status only for a task job visible to the authenticated session owner."""
+    try:
+        sess = load(sid)
+    except Exception:
+        return JSONResponse({"error": "Không đọc được trạng thái xử lý."}, status_code=503)
+    source = (sess or {}).get("source") or {}
+    if not sess or source.get("kind") != "task" or source.get("owner_id") != _current_user_id.get():
+        return JSONResponse({"error": "Không tìm thấy yêu cầu AI cho công việc này."}, status_code=404)
+    if sess.get("status") == "running" and sid not in _task_jobs:
+        sess["status"], sess["error"] = "error", "Máy chủ Văn phòng AI đã khởi động lại khi đang xử lý. Hãy gửi lại yêu cầu."
+        save(sess)
+    return {
+        "id": sid,
+        "task_id": (sess.get("source") or {}).get("task_id"),
+        "status": sess.get("status", "running"),
+        "error": sess.get("error", "") if sess.get("status") == "error" else "",
+        "ready": sess.get("status") == "done" and bool(sess.get("report_md")),
+    }
+
+
+@app.get("/task-jobs/{sid}/docx")
+async def task_job_docx(sid: str):
+    """Download the completed task consultation as a Word document."""
+    try:
+        sess = load(sid)
+    except Exception:
+        return JSONResponse({"error": "Không đọc được kết quả AI."}, status_code=503)
+    source = (sess or {}).get("source") or {}
+    if not sess or source.get("kind") != "task" or source.get("owner_id") != _current_user_id.get():
+        return JSONResponse({"error": "Không tìm thấy kết quả AI cho công việc này."}, status_code=404)
+    if sess.get("status") != "done" or not sess.get("report_md"):
+        return JSONResponse({"error": "Báo cáo chưa sẵn sàng để tải."}, status_code=409)
+    docx = build_docx(sess)
+    return Response(
+        docx,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="AI_goi_y_{sid}.docx"'},
+    )
 
 
 @app.get("/stream/{sid}")
